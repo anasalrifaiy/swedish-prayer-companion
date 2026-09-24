@@ -18,13 +18,13 @@ function formatDuration(seconds: number) {
 export default function TodayScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { city, today, loading, locating, error, permission, locate, openSettings, refresh } = usePrayer();
+  const { city, today, tomorrow, loading, locating, error, permission, locate, openSettings, refresh } = usePrayer();
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
-  const state = getPrayerState(today, now);
+  const state = getPrayerState(today, now, tomorrow);
   const date = new Intl.DateTimeFormat('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' }).format(now);
   const webTop = Platform.OS === 'web' ? 67 : 0;
 
@@ -53,7 +53,7 @@ export default function TodayScreen() {
             </View>
             <Text style={[styles.permissionTitle, { color: colors.foreground }]}>Bönetider där du är</Text>
             <Text style={[styles.permissionBody, { color: colors.mutedForeground }]}>
-              Vi använder din plats för att välja närmaste stad i Islamiska förbundets svenska tabell.
+              Vi använder din plats för att hitta din stad i Islamiska förbundets svenska tabell. I webbläsaren används en separat karttjänst för att slå upp stadens namn.
             </Text>
             {!!error && <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text>}
             <Pressable
@@ -73,15 +73,15 @@ export default function TodayScreen() {
             <View style={styles.heroCopy}>
               <Text style={[styles.kicker, { color: colors.softGold }]}>NÄSTA BÖN</Text>
               <Text style={[styles.nextPrayer, { color: colors.primaryForeground }]}>
-                {state.next ? swedishPrayerNames[state.next.name] : 'Fajr'}
+                 {state.next ? swedishPrayerNames[state.next.name] : 'Ingen tid'}
               </Text>
               <Text style={[styles.nextTime, { color: colors.primaryForeground }]}>
-                {state.next ? today?.[state.next.name] : today?.Fajr ?? '--:--'}
+                 {state.next ? `${String(state.next.time.getHours()).padStart(2, '0')}:${String(state.next.time.getMinutes()).padStart(2, '0')}` : '--:--'}
               </Text>
               <View style={[styles.countdown, { backgroundColor: colors.softGold }]}>
                 <Feather name="clock" size={15} color={colors.accentForeground} />
                 <Text style={[styles.countdownText, { color: colors.accentForeground }]}>
-                  {state.next ? `om ${formatDuration(state.secondsLeft)}` : 'i morgon'}
+                   {state.next ? `om ${formatDuration(state.secondsLeft)}` : 'Tabell saknas'}
                 </Text>
               </View>
             </View>
@@ -97,7 +97,7 @@ export default function TodayScreen() {
                 </View>
               </View>
               {prayers.map((name, index) => {
-                const active = state.next?.name === name;
+                 const active = state.next?.name === name && state.next.time.getDate() === now.getDate();
                 return (
                   <View key={name} style={[styles.prayerRow, index < prayers.length - 1 && { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
                     <View style={[styles.prayerIcon, { backgroundColor: active ? colors.primary : colors.muted }]}>

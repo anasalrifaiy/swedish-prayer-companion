@@ -4,15 +4,14 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { usePrayer } from '@/context/PrayerContext';
 import { useColors } from '@/hooks/useColors';
+import { normalizePlace } from '@/lib/prayer';
 
 export function CityPicker({ compact = false }: { compact?: boolean }) {
   const colors = useColors();
   const { city, dataset, selectCity, locate, locating } = usePrayer();
   const [visible, setVisible] = useState(false);
   const [query, setQuery] = useState('');
-  const filtered = (dataset?.cities ?? []).filter((item) =>
-    item.toLocaleLowerCase('sv-SE').includes(query.toLocaleLowerCase('sv-SE')),
-  );
+  const filtered = (dataset?.cities ?? []).filter((item) => normalizePlace(item).includes(normalizePlace(query)));
   return (
     <>
       <Pressable

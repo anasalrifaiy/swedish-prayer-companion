@@ -1,0 +1,1 @@
+- [Expo web location lookup](expo-web-location.md) — web coordinates work, but Expo reverse geocoding does not; verify city matching separately from GPS.

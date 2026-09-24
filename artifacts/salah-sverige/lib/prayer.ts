@@ -37,13 +37,17 @@ export function findSupportedCity(
   cities: string[],
   candidates: Array<string | null | undefined>,
 ) {
-  const normalized = candidates.filter(Boolean).map((item) => normalizePlace(item!));
-  return (
-    cities.find((city) => {
-      const key = normalizePlace(city);
-      return normalized.some((candidate) => candidate === key || candidate.includes(key) || key.includes(candidate));
-    }) ?? null
-  );
+  const normalized = candidates.filter(Boolean).flatMap((item) => {
+    const value = normalizePlace(item!);
+    // Some web reverse geocoders return "Enköpings kommun" rather than "Enköping".
+    const municipality = value.match(/^(.+?)skommun$/);
+    return municipality ? [value, municipality[1]] : [value];
+  });
+  for (const candidate of normalized) {
+    const match = cities.find((city) => normalizePlace(city) === candidate);
+    if (match) return match;
+  }
+  return null;
 }
 
 export function normalizePrayerDataset(input: unknown): PrayerDataset {
@@ -83,7 +87,7 @@ export const swedishPrayerNames: Record<PrayerName, string> = {
   Isha: 'Isha',
 };
 
-export function getPrayerState(day: PrayerDay | undefined, now = new Date()) {
+export function getPrayerState(day: PrayerDay | undefined, now = new Date(), tomorrow?: PrayerDay) {
   if (!day) return { current: null, next: null, secondsLeft: 0 };
   const scheduled = prayers
     .filter((name) => name !== 'Shuruk')
@@ -93,7 +97,14 @@ export function getPrayerState(day: PrayerDay | undefined, now = new Date()) {
       time.setHours(hour, minute, 0, 0);
       return { name, time };
     });
-  const next = scheduled.find((item) => item.time > now) ?? null;
+  let next = scheduled.find((item) => item.time > now) ?? null;
+  if (!next && tomorrow?.Fajr) {
+    const [hour, minute] = tomorrow.Fajr.split(':').map(Number);
+    const time = new Date(now);
+    time.setDate(time.getDate() + 1);
+    time.setHours(hour, minute, 0, 0);
+    next = { name: 'Fajr' as const, time };
+  }
   const current = [...scheduled].reverse().find((item) => item.time <= now) ?? null;
   return {
     current,
