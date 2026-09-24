@@ -5,13 +5,8 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-export interface HealthStatus {
-  status: string;
-}
-
-export type PrayerTimesDatasetCitiesItem = { [key: string]: unknown };
-
-export type PrayerTimesDatasetTables = { [key: string]: unknown };
+import type { PrayerTimesDatasetCitiesItem } from './prayerTimesDatasetCitiesItem';
+import type { PrayerTimesDatasetTables } from './prayerTimesDatasetTables';
 
 export interface PrayerTimesDataset {
   source: string;
@@ -20,8 +15,3 @@ export interface PrayerTimesDataset {
   tables: PrayerTimesDatasetTables;
   [key: string]: unknown;
  }
-
-export interface ApiError {
-  error: string;
-}
-

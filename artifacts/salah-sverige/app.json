@@ -4,17 +4,26 @@
     "slug": "salah-sverige",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/icon-salah.png",
     "scheme": "salah-sverige",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Salah Sverige använder din plats för att välja rätt svensk bönetidstabell och visa Qibla."
+      }
     },
-    "android": {},
+    "android": {
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      ["expo-location", { "locationWhenInUsePermission": "Salah Sverige använder din plats för rätt bönetider och Qibla." }],
+      ["expo-splash-screen", { "backgroundColor": "#07382F", "image": "./assets/images/icon-salah.png", "imageWidth": 170 }]
+    ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

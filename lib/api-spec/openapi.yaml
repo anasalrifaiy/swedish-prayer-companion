@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: prayer-times
+    description: Swedish prayer timetable operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /prayer-times:
+    get:
+      operationId: getPrayerTimes
+      tags: [prayer-times]
+      summary: Get Islamiska förbundet prayer times
+      description: Proxies the current Swedish city timetable dataset published by salat.muslim.se and sourced from Islamiska förbundet.
+      responses:
+        "200":
+          description: Current Swedish prayer timetable dataset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrayerTimesDataset"
+        "502":
+          description: The upstream timetable is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +54,27 @@ components:
           type: string
       required:
         - status
+    PrayerTimesDataset:
+      type: object
+      additionalProperties: true
+      required: [source, downloadedAt, cities, tables]
+      properties:
+        source:
+          type: string
+        downloadedAt:
+          type: string
+        cities:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        tables:
+          type: object
+          additionalProperties: true
+    ApiError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
 

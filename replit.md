@@ -1,6 +1,6 @@
-# [Project name]
+# Salah Sverige
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+En svensk mobilapp för platsbaserade bönetider från Islamiska förbundet och Qibla-riktning.
 
 ## Run & Operate
 
@@ -29,8 +29,9 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 _Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
 
 ## Product
-
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Hämtar användarens plats och matchar den mot en stad i Islamiska förbundets svenska tabell.
+- Visar dagens och månadens bönetider med tydlig källangivelse.
+- Visar Qibla-riktning och använder enhetens kompass på fysisk telefon.
 
 ## User preferences
 
