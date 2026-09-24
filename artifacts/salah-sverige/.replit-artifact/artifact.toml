@@ -1,0 +1,24 @@
+kind = "mobile"
+previewPath = "/"
+title = "Salah Sverige"
+description = "A Swedish-first Muslim prayer companion with location-based prayer times from Islamiska förbundet, a live Qibla compass, and clear attribution to the source."
+version = "1.0.0"
+id = "artifacts/salah-sverige"
+router = "expo-domain"
+
+[[services]]
+name = "expo"
+ensurePreviewReachable = "/status"
+paths = [ "/" ]
+localPort = 20733
+
+[services.development]
+run = "pnpm --filter @workspace/salah-sverige run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/salah-sverige", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/salah-sverige", "run", "serve" ]
+
+[services.env]
+PORT = "20733"
+BASE_PATH = "/"
