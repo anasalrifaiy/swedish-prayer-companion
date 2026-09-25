@@ -12,7 +12,33 @@ tags:
     description: Health operations
   - name: prayer-times
     description: Swedish prayer timetable operations
+  - name: reminders
+    description: Device prayer push subscriptions
 paths:
+  /reminders/device:
+    put:
+      operationId: saveReminderDevice
+      tags: [reminders]
+      summary: Replace a device's reminder subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReminderDeviceInput"
+      responses:
+        "200":
+          description: Subscription saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReminderDeviceStatus"
+        "400":
+          description: Invalid subscription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
   /healthz:
     get:
       operationId: healthCheck
@@ -47,6 +73,29 @@ paths:
                 $ref: "#/components/schemas/ApiError"
 components:
   schemas:
+    ReminderDeviceInput:
+      type: object
+      required: [token, enabled, city, mode, prayers, localUntil]
+      properties:
+        token: { type: string, pattern: "^Expo(nent)?PushToken\\[[A-Za-z0-9_-]+\\]$", maxLength: 256 }
+        enabled: { type: boolean }
+        city: { type: string, maxLength: 120 }
+        mode: { type: string, enum: [vibration, sound] }
+        prayers:
+          type: object
+          required: [Fajr, Dhuhr, Asr, Maghrib, Isha]
+          properties:
+            Fajr: { type: boolean }
+            Dhuhr: { type: boolean }
+            Asr: { type: boolean }
+            Maghrib: { type: boolean }
+            Isha: { type: boolean }
+        localUntil: { type: string, format: date-time }
+    ReminderDeviceStatus:
+      type: object
+      required: [active]
+      properties:
+        active: { type: boolean }
     HealthStatus:
       type: object
       properties:

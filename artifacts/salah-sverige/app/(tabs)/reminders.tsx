@@ -15,7 +15,7 @@ export default function RemindersScreen() {
   const { city } = usePrayer();
   const {
     preferences, loading, saving, permissionGranted, error,
-    scheduledCount, scheduledUntil, updatePreferences, openSettings,
+    scheduledCount, scheduledUntil, pushActive, updatePreferences, openSettings,
   } = useReminders();
   const disabled = loading || saving || Platform.OS === 'web';
   const update = (next: typeof preferences) => { void updatePreferences(next); };
@@ -68,6 +68,11 @@ export default function RemindersScreen() {
                 : `${scheduledCount} aviseringar planerade${scheduledUntil
                   ? ` till ${new Intl.DateTimeFormat('sv-SE', { day: 'numeric', month: 'long' }).format(scheduledUntil)}`
                   : ''}.`}
+            </Text>
+          )}
+          {preferences.enabled && pushActive && (
+            <Text style={[styles.status, { color: colors.secondaryForeground }]}>
+              Därefter fortsätter aviseringarna via push enligt stadens publicerade tabell, även när appen är stängd.
             </Text>
           )}
         </View>
@@ -125,7 +130,7 @@ export default function RemindersScreen() {
         <View style={styles.footer}>
           <Feather name="info" size={17} color={colors.heroForeground} />
           <Text style={[styles.footerText, { color: colors.heroForeground }]}>
-            Soluppgång är inte en av de fem bönerna och ger ingen avisering. Tiderna gäller {city ?? 'den stad du väljer'}, inte exakt din GPS-plats. Öppna appen regelbundet för att förnya kommande påminnelser, särskilt efter ett stadsbyte eller vid årsskiftet. Avsedd för svensk tid.
+            Soluppgång är inte en av de fem bönerna och ger ingen avisering. Tiderna gäller {city ?? 'den stad du väljer'}, inte exakt din GPS-plats. Pushaviseringar följer svensk tid även om du reser. Vid årsskiftet krävs en ny publicerad årstabell. Telefonens behörighet och batteriinställningar kan påverka leverans.
           </Text>
         </View>
       </ScrollView>

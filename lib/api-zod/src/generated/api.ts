@@ -9,6 +9,37 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Replace a device's reminder subscription
+ */
+export const saveReminderDeviceBodyTokenMax = 256;
+
+
+export const saveReminderDeviceBodyTokenRegExp = new RegExp('^Expo(nent)?PushToken\\[[A-Za-z0-9_-]+\\]$');
+export const saveReminderDeviceBodyCityMax = 120;
+
+
+
+export const SaveReminderDeviceBody = zod.object({
+  "token": zod.string().max(saveReminderDeviceBodyTokenMax).regex(saveReminderDeviceBodyTokenRegExp),
+  "enabled": zod.boolean(),
+  "city": zod.string().max(saveReminderDeviceBodyCityMax),
+  "mode": zod.enum(['vibration', 'sound']),
+  "prayers": zod.object({
+  "Fajr": zod.boolean(),
+  "Dhuhr": zod.boolean(),
+  "Asr": zod.boolean(),
+  "Maghrib": zod.boolean(),
+  "Isha": zod.boolean()
+}),
+  "localUntil": zod.coerce.date()
+})
+
+export const SaveReminderDeviceResponse = zod.object({
+  "active": zod.boolean()
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */

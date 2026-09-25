@@ -5,6 +5,40 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export type ReminderDeviceInputMode = typeof ReminderDeviceInputMode[keyof typeof ReminderDeviceInputMode];
+
+
+export const ReminderDeviceInputMode = {
+  vibration: 'vibration',
+  sound: 'sound',
+} as const;
+
+export type ReminderDeviceInputPrayers = {
+  Fajr: boolean;
+  Dhuhr: boolean;
+  Asr: boolean;
+  Maghrib: boolean;
+  Isha: boolean;
+};
+
+export interface ReminderDeviceInput {
+  /**
+     * @maxLength 256
+     * @pattern ^Expo(nent)?PushToken\[[A-Za-z0-9_-]+\]$
+     */
+  token: string;
+  enabled: boolean;
+  /** @maxLength 120 */
+  city: string;
+  mode: ReminderDeviceInputMode;
+  prayers: ReminderDeviceInputPrayers;
+  localUntil: string;
+}
+
+export interface ReminderDeviceStatus {
+  active: boolean;
+}
+
 export interface HealthStatus {
   status: string;
 }

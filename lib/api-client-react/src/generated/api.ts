@@ -6,11 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 import {
+  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
@@ -18,11 +22,13 @@ import type {
 import type {
   ApiError,
   HealthStatus,
-  PrayerTimesDataset
+  PrayerTimesDataset,
+  ReminderDeviceInput,
+  ReminderDeviceStatus
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
-import type { ErrorType } from '../custom-fetch';
+import type { ErrorType , BodyType } from '../custom-fetch';
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -47,6 +53,94 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getSaveReminderDeviceUrl = () => {
+
+
+
+
+  return `/api/reminders/device`
+}
+
+/**
+ * @summary Replace a device's reminder subscription
+ */
+export const saveReminderDevice = async (reminderDeviceInput: ReminderDeviceInput, options?: Parameters<typeof customFetch>[1]): Promise<ReminderDeviceStatus> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ReminderDeviceStatus>(getSaveReminderDeviceUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reminderDeviceInput)
+  }
+);}
+
+
+
+
+
+export const getSaveReminderDeviceMutationKey = () => ['saveReminderDevice'] as const;
+
+export const getSaveReminderDeviceMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveReminderDevice>>, TError,SaveReminderDeviceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveReminderDevice>>, TError,SaveReminderDeviceMutationVariables, TContext> => {
+
+const mutationKey = getSaveReminderDeviceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveReminderDevice>>, SaveReminderDeviceMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveReminderDevice(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveReminderDeviceMutationResult = NonNullable<Awaited<ReturnType<typeof saveReminderDevice>>>
+    export type SaveReminderDeviceMutationBody = BodyType<ReminderDeviceInput>
+    export type SaveReminderDeviceMutationError = ErrorType<ApiError>
+    export type SaveReminderDeviceMutationVariables = {data: BodyType<ReminderDeviceInput>}
+
+    /**
+ * @summary Replace a device's reminder subscription
+ */
+export const useSaveReminderDevice = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveReminderDevice>>, TError,SaveReminderDeviceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveReminderDevice>>,
+        TError,
+        SaveReminderDeviceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSaveReminderDeviceMutationOptions(options));
+    }
 
 export const getHealthCheckUrl = () => {
 

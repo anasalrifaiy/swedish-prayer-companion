@@ -11,3 +11,7 @@ export * from './healthStatus';
 export * from './prayerTimesDataset';
 export * from './prayerTimesDatasetCitiesItem';
 export * from './prayerTimesDatasetTables';
+export * from './reminderDeviceInput';
+export * from './reminderDeviceInputMode';
+export * from './reminderDeviceInputPrayers';
+export * from './reminderDeviceStatus';
