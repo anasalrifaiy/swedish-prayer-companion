@@ -1,1 +1,2 @@
 - [Expo web location lookup](expo-web-location.md) — web coordinates work, but Expo reverse geocoding does not; verify city matching separately from GPS.
+- [Query-string decoder compatibility](query-string-decoder.md) — patched decoder exports ESM default; old CommonJS consumers need an adapter.
