@@ -35,6 +35,7 @@ export default function TabLayout() {
       <Tabs.Screen name="index" options={{ title: 'Idag', tabBarIcon: ({ color }) => <Feather name="sun" size={22} color={color} /> }} />
       <Tabs.Screen name="calendar" options={{ title: 'Månad', tabBarIcon: ({ color }) => <Feather name="calendar" size={21} color={color} /> }} />
       <Tabs.Screen name="qibla" options={{ title: 'Qibla', tabBarIcon: ({ color }) => <MaterialCommunityIcons name="compass-outline" size={24} color={color} /> }} />
+      <Tabs.Screen name="reminders" options={{ title: 'Påminnelser', tabBarIcon: ({ color }) => <Feather name="bell" size={22} color={color} /> }} />
     </Tabs>
   );
 }
