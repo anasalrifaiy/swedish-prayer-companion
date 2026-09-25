@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Prayers",
+    "name": "Prayer Sverige",
     "slug": "prayers",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Salah Sverige använder din plats för att välja rätt svensk bönetidstabell och visa Qibla."
+        "NSLocationWhenInUseUsageDescription": "Prayer Sverige använder din plats för att välja närmaste svenska tabellstad och visa Qibla."
       },
       "bundleIdentifier": "com.prayers.app"
     },
@@ -29,7 +29,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Salah Sverige använder din plats för rätt bönetider och Qibla."
+          "locationWhenInUsePermission": "Prayer Sverige använder din plats för att välja närmaste svenska tabellstad och visa Qibla."
         }
       ],
       [

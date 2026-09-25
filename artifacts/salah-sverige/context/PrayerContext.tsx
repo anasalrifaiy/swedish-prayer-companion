@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
-import { Linking, Platform } from 'react-native';
+import React, { createContext, useContext, useMemo, useRef, useState } from 'react';
+import { AppState, Linking, Platform } from 'react-native';
 import * as Location from 'expo-location';
 import { getGetPrayerTimesQueryKey, useGetPrayerTimes } from '@workspace/api-client-react';
 import {
@@ -38,6 +38,10 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
   const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const locatingRef = useRef(false);
+  const autoLocateStartedRef = useRef(false);
+  const hasLocationAccessRef = useRef(false);
+  const manualSelectionRef = useRef(0);
   const [date, setDate] = useState(() => new Date());
   React.useEffect(() => {
     const timer = setInterval(() => setDate(new Date()), 60_000);
@@ -53,6 +57,9 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
   });
 
   const locate = async () => {
+    if (locatingRef.current) return;
+    locatingRef.current = true;
+    const selectionAtStart = manualSelectionRef.current;
     setLocating(true);
     setLocationError(null);
     try {
@@ -61,13 +68,25 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
         setLocationError('Platsåtkomst behövs för att välja rätt svensk stad.');
         return;
       }
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      const coords = {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      };
+      hasLocationAccessRef.current = true;
+      // Expo's web getCurrentPositionAsync permits an indefinitely cached result.
+      // Ask the browser for a fresh fix when reopening the page.
+      let coords: Coordinates;
+      if (Platform.OS === 'web') {
+        coords = await new Promise<Coordinates>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(
+              (position) => resolve({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+              }),
+              reject,
+              { maximumAge: 0, timeout: 15000 },
+            );
+          });
+      } else {
+        const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        coords = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+      }
       setCoordinates(coords);
       let countryCode: string | null | undefined;
       if (Platform.OS === 'web') {
@@ -80,7 +99,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
         countryCode = places[0]?.isoCountryCode;
       }
       if (countryCode?.toUpperCase() !== 'SE') {
-        if (nearestDistanceKm !== null) {
+        if (nearestDistanceKm !== null && manualSelectionRef.current === selectionAtStart) {
           setCity(null);
           setNearestDistanceKm(null);
         }
@@ -96,17 +115,54 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       }
       const nearest = nearestSupportedCity(dataset.cities, coords);
       if (nearest) {
-        setCity(nearest.city);
-        setNearestDistanceKm(nearest.distanceKm);
+        if (manualSelectionRef.current === selectionAtStart) {
+          setCity(nearest.city);
+          setNearestDistanceKm(nearest.distanceKm);
+        }
       } else {
         setLocationError('Ingen av tabellens städer kunde jämföras med din plats. Välj stad manuellt.');
       }
     } catch {
       setLocationError('Det gick inte att läsa eller kontrollera din plats. Försök igen eller välj stad.');
     } finally {
+      locatingRef.current = false;
       setLocating(false);
     }
   };
+
+  // Locate once when the page opens, then refresh GPS whenever the app returns
+  // to the foreground after location access has been granted.
+  React.useEffect(() => {
+    if (!permission || autoLocateStartedRef.current) return;
+    autoLocateStartedRef.current = true;
+    if (permission.granted || permission.status === 'undetermined') void locate();
+  }, [permission?.status, permission?.granted]);
+  const locateRef = useRef(locate);
+  locateRef.current = locate;
+  React.useEffect(() => {
+    if (Platform.OS === 'web') {
+      const refreshOnFocus = () => {
+        if ((permission?.granted || hasLocationAccessRef.current) && autoLocateStartedRef.current) void locateRef.current();
+      };
+      const refreshOnVisible = () => {
+        if (document.visibilityState === 'visible') refreshOnFocus();
+      };
+      window.addEventListener('focus', refreshOnFocus);
+      document.addEventListener('visibilitychange', refreshOnVisible);
+      return () => {
+        window.removeEventListener('focus', refreshOnFocus);
+        document.removeEventListener('visibilitychange', refreshOnVisible);
+      };
+    }
+    let previousState = AppState.currentState;
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (previousState !== 'active' && nextState === 'active' && (permission?.granted || hasLocationAccessRef.current)) {
+        void locateRef.current();
+      }
+      previousState = nextState;
+    });
+    return () => subscription.remove();
+  }, [permission?.granted]);
 
   const month = city ? query.data?.tables[city]?.[String(date.getMonth() + 1)] ?? [] : [];
   const today = month.find((day) => day.day === date.getDate());
@@ -130,6 +186,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       permission,
       locate,
       selectCity: (selectedCity) => {
+        manualSelectionRef.current += 1;
         setCity(selectedCity);
         setNearestDistanceKm(null);
         setLocationError(null);

@@ -1,6 +1,6 @@
 kind = "mobile"
 previewPath = "/"
-title = "Salah Sverige"
+title = "Prayer Sverige"
 description = "A Swedish-first Muslim prayer companion with location-based prayer times from Islamiska förbundet, a live Qibla compass, and clear attribution to the source."
 version = "1.0.0"
 id = "artifacts/salah-sverige"

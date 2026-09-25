@@ -16,10 +16,10 @@ export default function CalendarScreen() {
     <AppBackground>
       <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'web' ? 67 : 0) + 14 }]}>
         <Text style={[styles.kicker, { color: colors.softGold }]}>MÅNADSÖVERSIKT</Text>
-        <Text style={[styles.title, { color: colors.primaryForeground }]}>{monthName}</Text>
+        <Text style={[styles.title, { color: colors.heroForeground }]}>{monthName}</Text>
         <View style={styles.picker}><CityPicker compact /></View>
         {city && nearestDistanceKm !== null && (
-          <Text style={[styles.nearestNotice, { color: colors.primaryForeground }]}>
+          <Text style={[styles.nearestNotice, { color: colors.heroForeground }]}>
             Närmaste tabellstad: {city} · {Math.round(nearestDistanceKm)} km bort. Tiderna gäller {city}.
           </Text>
         )}
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   kicker: { fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 1.8 },
   title: { fontFamily: 'Inter_700Bold', fontSize: 31, textTransform: 'capitalize', marginTop: 5 },
   picker: { marginTop: 14, alignItems: 'flex-start' },
-  nearestNotice: { fontFamily: 'Inter_500Medium', fontSize: 12, lineHeight: 18, marginTop: 10 },
+  nearestNotice: { fontFamily: 'Inter_600SemiBold', fontSize: 13, lineHeight: 19, marginTop: 10 },
   sheet: { flex: 1, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 12, paddingHorizontal: 12, overflow: 'hidden' },
   tableHeader: { height: 38, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth },
   th: { flex: 1, textAlign: 'center', fontFamily: 'Inter_700Bold', fontSize: 9 },

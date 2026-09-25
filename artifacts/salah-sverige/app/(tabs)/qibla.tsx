@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { AppBackground } from '@/components/AppBackground';
@@ -57,8 +57,8 @@ export default function QiblaScreen() {
     <AppBackground>
       <View style={[styles.content, { paddingTop: insets.top + (Platform.OS === 'web' ? 67 : 0) + 18 }]}>
         <Text style={[styles.kicker, { color: colors.softGold }]}>QIBLAKOMPASS</Text>
-        <Text style={[styles.title, { color: colors.primaryForeground }]}>Mot Kaba</Text>
-        <Text style={[styles.subtitle, { color: colors.primaryForeground }]}>
+        <Text style={[styles.title, { color: colors.heroForeground }]}>Mot Kaba</Text>
+        <Text style={[styles.subtitle, { color: colors.heroForeground }]}>
           {coordinates ? 'Från din aktuella plats' : cityCoordinates && city ? `Ungefär från centrala ${city}` : city ? `Hämta din plats nära ${city}` : 'Hämta din plats för rätt riktning'}
         </Text>
         <View style={[styles.compassOuter, { borderColor: colors.softGold, backgroundColor: colors.card }]}>
@@ -70,10 +70,8 @@ export default function QiblaScreen() {
           </View>
           <View style={[styles.tickCircle, { borderColor: colors.border }]} />
           <View style={[styles.needleWrap, { transform: [{ rotate: `${rotation}deg` }] }]}>
-            <View style={[styles.needle, { backgroundColor: colors.primary }]}>
-              <MaterialCommunityIcons name="star-four-points" size={26} color={colors.primaryForeground} />
-            </View>
-            <View style={[styles.needleTail, { backgroundColor: colors.mutedForeground }]} />
+            <View style={[styles.needle, { borderBottomColor: colors.primary }]} />
+            <View style={[styles.needleTail, { borderTopColor: colors.mutedForeground }]} />
           </View>
           <View style={[styles.center, { backgroundColor: colors.accent }]} />
         </View>
@@ -108,7 +106,7 @@ export default function QiblaScreen() {
         {permission?.status === 'denied' && !permission.canAskAgain && Platform.OS !== 'web' && (
           <Pressable onPress={openSettings}><Text style={[styles.feedback, { color: colors.softGold }]}>Öppna platsinställningar</Text></Pressable>
         )}
-        <Text style={[styles.note, { color: colors.primaryForeground }]}>
+        <Text style={[styles.note, { color: colors.foreground, backgroundColor: colors.card }]}>
           {Platform.OS === 'web'
             ? 'Webbläsaren visar riktningen i grader från norr, men saknar livekompass. Öppna appen på en telefon för en pil som följer hur du vrider enheten.'
             : sensorError
@@ -126,17 +124,17 @@ const styles = StyleSheet.create({
   content: { flex: 1, paddingHorizontal: 22, alignItems: 'center', paddingBottom: 96 },
   kicker: { fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 2 },
   title: { fontFamily: 'Inter_700Bold', fontSize: 34, marginTop: 6 },
-  subtitle: { fontFamily: 'Inter_400Regular', fontSize: 14, opacity: 0.78, marginTop: 3 },
+  subtitle: { fontFamily: 'Inter_500Medium', fontSize: 14, marginTop: 3 },
   compassOuter: { width: 284, height: 284, borderRadius: 142, borderWidth: 2, marginTop: 36, alignItems: 'center', justifyContent: 'center' },
   dial: { position: 'absolute', width: 280, height: 280 },
   tickCircle: { position: 'absolute', width: 230, height: 230, borderRadius: 115, borderWidth: 1 },
-  north: { position: 'absolute', top: 15, fontFamily: 'Inter_700Bold' },
-  east: { position: 'absolute', right: 18, fontFamily: 'Inter_700Bold' },
-  south: { position: 'absolute', bottom: 15, fontFamily: 'Inter_700Bold' },
-  west: { position: 'absolute', left: 18, fontFamily: 'Inter_700Bold' },
+  north: { position: 'absolute', top: 15, left: 0, right: 0, textAlign: 'center', fontFamily: 'Inter_700Bold' },
+  east: { position: 'absolute', right: 18, top: 131, fontFamily: 'Inter_700Bold' },
+  south: { position: 'absolute', bottom: 15, left: 0, right: 0, textAlign: 'center', fontFamily: 'Inter_700Bold' },
+  west: { position: 'absolute', left: 18, top: 131, fontFamily: 'Inter_700Bold' },
   needleWrap: { position: 'absolute', width: 70, height: 220, alignItems: 'center' },
-  needle: { width: 54, height: 102, borderTopLeftRadius: 27, borderTopRightRadius: 27, borderBottomLeftRadius: 12, borderBottomRightRadius: 12, alignItems: 'center', paddingTop: 15 },
-  needleTail: { width: 18, height: 76, borderBottomLeftRadius: 9, borderBottomRightRadius: 9, opacity: 0.45 },
+  needle: { width: 0, height: 0, borderLeftWidth: 24, borderRightWidth: 24, borderBottomWidth: 96, borderLeftColor: 'transparent', borderRightColor: 'transparent' },
+  needleTail: { width: 0, height: 0, borderLeftWidth: 24, borderRightWidth: 24, borderTopWidth: 96, borderLeftColor: 'transparent', borderRightColor: 'transparent' },
   center: { position: 'absolute', width: 18, height: 18, borderRadius: 9 },
   readout: { width: '100%', borderRadius: 22, padding: 17, marginTop: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   readoutLabel: { fontFamily: 'Inter_700Bold', fontSize: 9, letterSpacing: 1.2 },
@@ -145,7 +143,7 @@ const styles = StyleSheet.create({
   statusText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
   button: { minHeight: 54, alignSelf: 'stretch', borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, marginTop: 28 },
   buttonText: { fontFamily: 'Inter_700Bold', fontSize: 15 },
-  note: { fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 17, textAlign: 'center', opacity: 0.65, marginTop: 17, paddingHorizontal: 16 },
+  note: { fontFamily: 'Inter_500Medium', fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 17, paddingHorizontal: 16, paddingVertical: 13, borderRadius: 16 },
   feedback: { fontFamily: 'Inter_500Medium', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 16 },
   pressed: { opacity: 0.75, transform: [{ scale: 0.98 }] },
 });

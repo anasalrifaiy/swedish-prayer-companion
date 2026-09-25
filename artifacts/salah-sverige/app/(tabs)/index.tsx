@@ -37,8 +37,8 @@ export default function TodayScreen() {
       >
         <View style={styles.topbar}>
           <View>
-            <Text style={[styles.brand, { color: colors.softGold }]}>SALAH SVERIGE</Text>
-            <Text style={[styles.date, { color: colors.primaryForeground }]}>{date}</Text>
+            <Text style={[styles.brand, { color: colors.softGold }]}>PRAYER SVERIGE</Text>
+            <Text style={[styles.date, { color: colors.heroForeground }]}>{date}</Text>
           </View>
           <View style={[styles.star, { borderColor: colors.softGold }]}>
             <MaterialCommunityIcons name="star-four-points-outline" size={21} color={colors.softGold} />
@@ -46,7 +46,7 @@ export default function TodayScreen() {
         </View>
         <View style={styles.cityWrap}><CityPicker compact /></View>
         {city && nearestDistanceKm !== null && (
-          <Text style={[styles.nearestNotice, { color: colors.primaryForeground }]}>
+          <Text style={[styles.nearestNotice, { color: colors.heroForeground }]}>
             Närmaste tabellstad: {city} · {Math.round(nearestDistanceKm)} km från dig. Tiderna gäller {city}, inte exakt din plats.
           </Text>
         )}
@@ -78,10 +78,10 @@ export default function TodayScreen() {
           <>
             <View style={styles.heroCopy}>
               <Text style={[styles.kicker, { color: colors.softGold }]}>NÄSTA BÖN</Text>
-              <Text style={[styles.nextPrayer, { color: colors.primaryForeground }]}>
+              <Text style={[styles.nextPrayer, { color: colors.heroForeground }]}>
                  {state.next ? swedishPrayerNames[state.next.name] : 'Ingen tid'}
               </Text>
-              <Text style={[styles.nextTime, { color: colors.primaryForeground }]}>
+              <Text style={[styles.nextTime, { color: colors.heroForeground }]}>
                  {state.next ? `${String(state.next.time.getHours()).padStart(2, '0')}:${String(state.next.time.getMinutes()).padStart(2, '0')}` : '--:--'}
               </Text>
               <View style={[styles.countdown, { backgroundColor: colors.softGold }]}>
@@ -130,14 +130,14 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 18, paddingBottom: 112, minHeight: '100%' },
   topbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   brand: { fontFamily: 'Inter_700Bold', fontSize: 11, letterSpacing: 2.1 },
-  date: { fontFamily: 'Inter_500Medium', fontSize: 14, marginTop: 4, textTransform: 'capitalize', opacity: 0.9 },
+  date: { fontFamily: 'Inter_600SemiBold', fontSize: 15, marginTop: 5, textTransform: 'capitalize' },
   star: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   cityWrap: { marginTop: 18, alignItems: 'flex-start' },
-  nearestNotice: { fontFamily: 'Inter_500Medium', fontSize: 12, lineHeight: 18, marginTop: 10, opacity: 0.9 },
+  nearestNotice: { fontFamily: 'Inter_600SemiBold', fontSize: 13, lineHeight: 19, marginTop: 13 },
   locationWarning: { fontFamily: 'Inter_500Medium', fontSize: 12, lineHeight: 18, marginTop: 10 },
   heroCopy: { alignItems: 'center', paddingTop: 24, paddingBottom: 26 },
   kicker: { fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 2 },
-  nextPrayer: { fontFamily: 'Inter_500Medium', fontSize: 22, marginTop: 8 },
+  nextPrayer: { fontFamily: 'Inter_600SemiBold', fontSize: 23, marginTop: 8 },
   nextTime: { fontFamily: 'Inter_700Bold', fontSize: 58, letterSpacing: -2, lineHeight: 66 },
   countdown: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 13, paddingVertical: 7, borderRadius: 16, marginTop: 8 },
   countdownText: { fontFamily: 'Inter_700Bold', fontSize: 12 },
