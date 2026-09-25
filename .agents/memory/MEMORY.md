@@ -1,2 +1,3 @@
 - [Expo web location lookup](expo-web-location.md) — web coordinates work, but Expo reverse geocoding does not; verify city matching separately from GPS.
+- [Swedish timetable location policy](swedish-timetable-location.md) — nearest listed city is an approximation, not calculated local prayer times.
 - [Query-string decoder compatibility](query-string-decoder.md) — patched decoder exports ESM default; old CommonJS consumers need an adapter.

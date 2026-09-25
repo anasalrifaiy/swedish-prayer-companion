@@ -18,7 +18,7 @@ function formatDuration(seconds: number) {
 export default function TodayScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { city, today, tomorrow, loading, locating, error, permission, locate, openSettings, refresh } = usePrayer();
+  const { city, nearestDistanceKm, today, tomorrow, loading, locating, error, permission, locate, openSettings, refresh } = usePrayer();
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -45,6 +45,12 @@ export default function TodayScreen() {
           </View>
         </View>
         <View style={styles.cityWrap}><CityPicker compact /></View>
+        {city && nearestDistanceKm !== null && (
+          <Text style={[styles.nearestNotice, { color: colors.primaryForeground }]}>
+            Närmaste tabellstad: {city} · {Math.round(nearestDistanceKm)} km från dig. Tiderna gäller {city}, inte exakt din plats.
+          </Text>
+        )}
+        {!!city && !!error && <Text style={[styles.locationWarning, { color: colors.softGold }]}>{error}</Text>}
 
         {!city ? (
           <View style={[styles.permissionCard, { backgroundColor: colors.card }]}>
@@ -53,7 +59,7 @@ export default function TodayScreen() {
             </View>
             <Text style={[styles.permissionTitle, { color: colors.foreground }]}>Bönetider där du är</Text>
             <Text style={[styles.permissionBody, { color: colors.mutedForeground }]}>
-              Vi använder din plats för att hitta din stad i Islamiska förbundets svenska tabell. I webbläsaren används en separat karttjänst för att slå upp stadens namn.
+              Vi använder din plats för att välja närmaste stad i Islamiska förbundets svenska tabell. Tiderna gäller den staden, inte exakt din plats.
             </Text>
             {!!error && <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text>}
             <Pressable
@@ -110,6 +116,9 @@ export default function TodayScreen() {
               })}
             </View>
             <Text style={[styles.source, { color: colors.mutedForeground }]}>Källa: Islamiska förbundet i Sverige</Text>
+            {nearestDistanceKm !== null && (
+              <Text style={[styles.coordinateSource, { color: colors.mutedForeground }]}>Stadspositioner: GeoNames.org (CC BY 4.0)</Text>
+            )}
           </>
         )}
       </ScrollView>
@@ -124,6 +133,8 @@ const styles = StyleSheet.create({
   date: { fontFamily: 'Inter_500Medium', fontSize: 14, marginTop: 4, textTransform: 'capitalize', opacity: 0.9 },
   star: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   cityWrap: { marginTop: 18, alignItems: 'flex-start' },
+  nearestNotice: { fontFamily: 'Inter_500Medium', fontSize: 12, lineHeight: 18, marginTop: 10, opacity: 0.9 },
+  locationWarning: { fontFamily: 'Inter_500Medium', fontSize: 12, lineHeight: 18, marginTop: 10 },
   heroCopy: { alignItems: 'center', paddingTop: 24, paddingBottom: 26 },
   kicker: { fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 2 },
   nextPrayer: { fontFamily: 'Inter_500Medium', fontSize: 22, marginTop: 8 },
@@ -141,6 +152,7 @@ const styles = StyleSheet.create({
   prayerName: { flex: 1, fontFamily: 'Inter_600SemiBold', fontSize: 15 },
   prayerTime: { fontFamily: 'Inter_700Bold', fontSize: 17, fontVariant: ['tabular-nums'] },
   source: { textAlign: 'center', fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 15 },
+  coordinateSource: { textAlign: 'center', fontFamily: 'Inter_400Regular', fontSize: 10, marginTop: 4 },
   permissionCard: { borderRadius: 28, padding: 24, alignItems: 'center', marginTop: 54 },
   permissionIcon: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   permissionTitle: { fontFamily: 'Inter_700Bold', fontSize: 23, textAlign: 'center' },

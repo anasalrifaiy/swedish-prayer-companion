@@ -1,3 +1,5 @@
+import { cityCoordinates } from './city-coordinates';
+
 export const PRAYER_DATA_URL = 'https://salat.muslim.se/data/prayertimes.json';
 
 export type PrayerName = 'Fajr' | 'Shuruk' | 'Dhuhr' | 'Asr' | 'Maghrib' | 'Isha';
@@ -48,6 +50,26 @@ export function findSupportedCity(
     if (match) return match;
   }
   return null;
+}
+
+export function nearestSupportedCity(
+  cities: string[],
+  position: { latitude: number; longitude: number },
+): { city: string; distanceKm: number } | null {
+  if (!Number.isFinite(position.latitude) || !Number.isFinite(position.longitude)) return null;
+  const radians = (degrees: number) => degrees * Math.PI / 180;
+  let nearest: { city: string; distanceKm: number } | null = null;
+  for (const city of cities) {
+    const center = cityCoordinates[city];
+    if (!center) continue;
+    const latDiff = radians(center[0] - position.latitude);
+    const lonDiff = radians(center[1] - position.longitude);
+    const a = Math.sin(latDiff / 2) ** 2
+      + Math.cos(radians(position.latitude)) * Math.cos(radians(center[0])) * Math.sin(lonDiff / 2) ** 2;
+    const distanceKm = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
+    if (!nearest || distanceKm < nearest.distanceKm) nearest = { city, distanceKm };
+  }
+  return nearest;
 }
 
 export function normalizePrayerDataset(input: unknown): PrayerDataset {

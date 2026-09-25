@@ -3,22 +3,18 @@ import { Linking, Platform } from 'react-native';
 import * as Location from 'expo-location';
 import { getGetPrayerTimesQueryKey, useGetPrayerTimes } from '@workspace/api-client-react';
 import {
-  findSupportedCity,
+  nearestSupportedCity,
   normalizePrayerDataset,
   PrayerDay,
   PrayerDataset,
 } from '@/lib/prayer';
 
 type Coordinates = { latitude: number; longitude: number };
-type WebPlace = {
-  city?: string;
-  locality?: string;
-  countryCode?: string;
-  localityInfo?: { administrative?: Array<{ name: string }> };
-};
+type WebPlace = { countryCode?: string };
 type PrayerContextValue = {
   dataset?: PrayerDataset;
   city: string | null;
+  nearestDistanceKm: number | null;
   coordinates: Coordinates | null;
   today?: PrayerDay;
   tomorrow?: PrayerDay;
@@ -38,6 +34,7 @@ const PrayerContext = createContext<PrayerContextValue | null>(null);
 export function PrayerProvider({ children }: { children: React.ReactNode }) {
   const [permission, requestPermission] = Location.useForegroundPermissions();
   const [city, setCity] = useState<string | null>(null);
+  const [nearestDistanceKm, setNearestDistanceKm] = useState<number | null>(null);
   const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -72,34 +69,40 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
         longitude: position.coords.longitude,
       };
       setCoordinates(coords);
-      let candidates: Array<string | null | undefined>;
+      let countryCode: string | null | undefined;
       if (Platform.OS === 'web') {
         const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${coords.latitude}&longitude=${coords.longitude}&localityLanguage=sv`);
         if (!response.ok) throw new Error('Geocoding failed');
         const place: WebPlace = await response.json();
-        if (place.countryCode !== 'SE') {
-          setLocationError('Platsen verkar vara utanför Sverige. Välj en stad manuellt.');
-          return;
-        }
-        candidates = [place.city, place.locality, ...(place.localityInfo?.administrative?.map((item) => item.name) ?? [])];
+        countryCode = place.countryCode;
       } else {
         const places = await Location.reverseGeocodeAsync(coords);
-        const place = places[0];
-        candidates = [place?.city, place?.district, place?.subregion, place?.region, place?.name];
+        countryCode = places[0]?.isoCountryCode;
+      }
+      if (countryCode?.toUpperCase() !== 'SE') {
+        if (nearestDistanceKm !== null) {
+          setCity(null);
+          setNearestDistanceKm(null);
+        }
+        setLocationError(countryCode
+          ? 'Din plats är utanför Sverige. Islamiska förbundets tabell gäller bara svenska städer.'
+          : 'Vi kunde inte bekräfta att din plats är i Sverige. Försök igen eller välj stad.');
+        return;
       }
       const dataset = query.data ?? (await query.refetch()).data;
       if (!dataset) {
-        setLocationError('Bönetidstabellen kunde inte laddas. Försök igen eller välj stad.');
+        setLocationError('Bönetidstabellen kunde inte laddas. Kontrollera internetanslutningen och försök igen.');
         return;
       }
-      const matched = findSupportedCity(dataset.cities, candidates);
-      if (matched) {
-        setCity(matched);
+      const nearest = nearestSupportedCity(dataset.cities, coords);
+      if (nearest) {
+        setCity(nearest.city);
+        setNearestDistanceKm(nearest.distanceKm);
       } else {
-        setLocationError('Vi hittade din plats, men ingen exakt stad i tabellen. Välj närmaste stad.');
+        setLocationError('Ingen av tabellens städer kunde jämföras med din plats. Välj stad manuellt.');
       }
     } catch {
-      setLocationError('Det gick inte att hitta en stad från din plats. Välj stad manuellt eller försök igen.');
+      setLocationError('Det gick inte att läsa eller kontrollera din plats. Försök igen eller välj stad.');
     } finally {
       setLocating(false);
     }
@@ -116,6 +119,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
     () => ({
       dataset: query.data,
       city,
+      nearestDistanceKm,
       coordinates,
       today,
       tomorrow,
@@ -125,13 +129,17 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       error: locationError ?? (query.error instanceof Error ? query.error.message : null),
       permission,
       locate,
-      selectCity: setCity,
+      selectCity: (selectedCity) => {
+        setCity(selectedCity);
+        setNearestDistanceKm(null);
+        setLocationError(null);
+      },
       openSettings: async () => {
         if (Platform.OS !== 'web') await Linking.openSettings();
       },
       refresh: query.refetch,
     }),
-    [query.data, query.isLoading, query.error, query.refetch, city, coordinates, today, tomorrow, month, locating, locationError, permission],
+    [query.data, query.isLoading, query.error, query.refetch, city, nearestDistanceKm, coordinates, today, tomorrow, month, locating, locationError, permission],
   );
   return <PrayerContext.Provider value={value}>{children}</PrayerContext.Provider>;
 }

@@ -9,7 +9,7 @@ import { useColors } from '@/hooks/useColors';
 export default function CalendarScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { city, month } = usePrayer();
+  const { city, nearestDistanceKm, month } = usePrayer();
   const now = new Date();
   const monthName = new Intl.DateTimeFormat('sv-SE', { month: 'long', year: 'numeric' }).format(now);
   return (
@@ -18,6 +18,11 @@ export default function CalendarScreen() {
         <Text style={[styles.kicker, { color: colors.softGold }]}>MÅNADSÖVERSIKT</Text>
         <Text style={[styles.title, { color: colors.primaryForeground }]}>{monthName}</Text>
         <View style={styles.picker}><CityPicker compact /></View>
+        {city && nearestDistanceKm !== null && (
+          <Text style={[styles.nearestNotice, { color: colors.primaryForeground }]}>
+            Närmaste tabellstad: {city} · {Math.round(nearestDistanceKm)} km bort. Tiderna gäller {city}.
+          </Text>
+        )}
       </View>
       <View style={[styles.sheet, { backgroundColor: colors.background }]}>
         <View style={[styles.tableHeader, { borderBottomColor: colors.border }]}>
@@ -39,7 +44,11 @@ export default function CalendarScreen() {
               </View>
             );
           })}
-          {!!city && <Text style={[styles.source, { color: colors.mutedForeground }]}>Källa: Islamiska förbundet i Sverige</Text>}
+          {!!city && (
+            <Text style={[styles.source, { color: colors.mutedForeground }]}>
+              Källa: Islamiska förbundet i Sverige{nearestDistanceKm !== null ? '\nStadspositioner: GeoNames.org (CC BY 4.0)' : ''}
+            </Text>
+          )}
         </ScrollView>
       </View>
     </AppBackground>
@@ -51,6 +60,7 @@ const styles = StyleSheet.create({
   kicker: { fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 1.8 },
   title: { fontFamily: 'Inter_700Bold', fontSize: 31, textTransform: 'capitalize', marginTop: 5 },
   picker: { marginTop: 14, alignItems: 'flex-start' },
+  nearestNotice: { fontFamily: 'Inter_500Medium', fontSize: 12, lineHeight: 18, marginTop: 10 },
   sheet: { flex: 1, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 12, paddingHorizontal: 12, overflow: 'hidden' },
   tableHeader: { height: 38, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth },
   th: { flex: 1, textAlign: 'center', fontFamily: 'Inter_700Bold', fontSize: 9 },
