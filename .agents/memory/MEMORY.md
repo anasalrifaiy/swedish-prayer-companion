@@ -3,3 +3,4 @@
 - [Query-string decoder compatibility](query-string-decoder.md) — patched decoder exports ESM default; old CommonJS consumers need an adapter.
 - [Prayer notification scheduling](prayer-notification-scheduling.md) — dated local alerts need a rolling window and clear renewal limits; do not use fixed daily repeats.
 - [Workspace package installation](workspace-package-installation.md) — the general package helper targets the pnpm root, not a filtered artifact; inspect config after failures.
+- [Expo Go startup diagnostics](expo-go-startup-diagnostics.md) — distinguish a missing optional Metro DevTools library from a JavaScript bundle failure; confirm Metro still starts.
