@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { setBaseUrl } from '@workspace/api-client-react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -19,6 +19,7 @@ import * as SplashScreen from 'expo-splash-screen';
 SplashScreen.preventAutoHideAsync();
 setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
 const queryClient = new QueryClient();
+const FONT_LOAD_TIMEOUT_MS = 10_000;
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -27,10 +28,22 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
   });
+  const [fontLoadTimedOut, setFontLoadTimedOut] = useState(false);
   useEffect(() => {
-    if (fontsLoaded || fontError) SplashScreen.hideAsync();
-  }, [fontsLoaded, fontError]);
-  if (!fontsLoaded && !fontError) return null;
+    const timeout = setTimeout(() => setFontLoadTimedOut(true), FONT_LOAD_TIMEOUT_MS);
+    return () => clearTimeout(timeout);
+  }, []);
+  useEffect(() => {
+    if (fontsLoaded || fontError || fontLoadTimedOut) {
+      if (fontLoadTimedOut && !fontsLoaded && !fontError) {
+        console.warn('Font loading timed out; continuing with platform fallback fonts.');
+      }
+      void SplashScreen.hideAsync().catch((error) => {
+        console.warn('Could not hide the splash screen:', error);
+      });
+    }
+  }, [fontsLoaded, fontError, fontLoadTimedOut]);
+  if (!fontsLoaded && !fontError && !fontLoadTimedOut) return null;
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
