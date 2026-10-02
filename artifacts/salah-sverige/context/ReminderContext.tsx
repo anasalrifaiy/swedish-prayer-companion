@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { AppState, Linking, Platform } from 'react-native';
+import { isRunningInExpoGo } from 'expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type * as NotificationTypes from 'expo-notifications';
 import Constants from 'expo-constants';
@@ -189,6 +190,13 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
         setScheduledUntil(reminders.at(-1)?.date ?? null);
         localComplete = true;
         if (Object.values(snapshot.preferences.prayers).some(Boolean)) {
+          if (Platform.OS === 'android' && isRunningInExpoGo()) {
+            await disableRemote();
+            setError(inSwedenTime
+              ? null
+              : 'Expo Go stöder inte pushaviseringar på Android. Aviseringar utanför svensk tidszon kräver en installerad appversion.');
+            return;
+          }
           const projectId = Constants.easConfig?.projectId ?? Constants.expoConfig?.extra?.eas?.projectId;
           if (!projectId) throw new Error('Push needs an Expo project ID in a native build');
           const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;

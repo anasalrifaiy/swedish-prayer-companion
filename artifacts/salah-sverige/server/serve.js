@@ -16,109 +16,6 @@ const path = require('path');
 const STATIC_ROOT = path.resolve(__dirname, '..', 'static-build');
 const TEMPLATE_PATH = path.resolve(__dirname, 'templates', 'landing-page.html');
 const basePath = (process.env.BASE_PATH || '/').replace(/\/+$/, '');
-const STARTUP_DIAGNOSTIC_PATH = '/__diagnostics/startup';
-const MAX_DIAGNOSTIC_BYTES = 4096;
-const MAX_DIAGNOSTICS_PER_MINUTE = 30;
-let diagnosticWindowStartedAt = Date.now();
-let diagnosticRequestCount = 0;
-
-const ALLOWED_DIAGNOSTIC_STAGES = new Set([
-  'layout_module_loaded',
-  'error_handler_unavailable',
-  'root_mounted',
-  'fonts_loaded',
-  'font_error',
-  'uncaught_js_error',
-  'react_error_boundary',
-]);
-
-function writeStartupLog(record) {
-  process.stderr.write(`[Expo Go startup] ${JSON.stringify(record)}\n`);
-}
-
-function acceptDiagnosticRequest() {
-  const now = Date.now();
-  if (now - diagnosticWindowStartedAt >= 60_000) {
-    diagnosticWindowStartedAt = now;
-    diagnosticRequestCount = 0;
-  }
-  if (diagnosticRequestCount >= MAX_DIAGNOSTICS_PER_MINUTE) return false;
-  diagnosticRequestCount += 1;
-  return true;
-}
-
-function cleanDiagnosticText(value, maxLength) {
-  if (typeof value !== 'string') return undefined;
-  return value
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ' ')
-    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]')
-    .replace(/\b(token|api[_-]?key|password|secret)\s*[:=]\s*\S+/gi, '$1=[REDACTED]')
-    .slice(0, maxLength);
-}
-
-function respondJsonError(res, statusCode, message) {
-  res.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8' });
-  res.end(JSON.stringify({ error: message }));
-}
-
-function receiveStartupDiagnostic(req, res) {
-  if (req.method !== 'POST') {
-    res.writeHead(405, { allow: 'POST' });
-    res.end();
-    return;
-  }
-
-  if (!acceptDiagnosticRequest()) {
-    res.writeHead(429, { 'cache-control': 'no-store' });
-    res.end();
-    return;
-  }
-
-  let size = 0;
-  let tooLarge = false;
-  const chunks = [];
-
-  req.on('data', (chunk) => {
-    size += chunk.length;
-    if (size > MAX_DIAGNOSTIC_BYTES) {
-      tooLarge = true;
-      chunks.length = 0;
-      return;
-    }
-    if (!tooLarge) chunks.push(chunk);
-  });
-
-  req.on('end', () => {
-    if (tooLarge) {
-      respondJsonError(res, 413, 'Diagnostic payload too large');
-      return;
-    }
-
-    let diagnostic;
-    try {
-      diagnostic = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-    } catch {
-      respondJsonError(res, 400, 'Invalid diagnostic payload');
-      return;
-    }
-
-    if (!diagnostic || !ALLOWED_DIAGNOSTIC_STAGES.has(diagnostic.stage)) {
-      respondJsonError(res, 400, 'Unknown diagnostic stage');
-      return;
-    }
-
-    writeStartupLog({
-      source: 'client',
-      stage: diagnostic.stage,
-      name: cleanDiagnosticText(diagnostic.name, 100),
-      message: cleanDiagnosticText(diagnostic.message, 500),
-      stack: cleanDiagnosticText(diagnostic.stack, 2000),
-      isFatal: diagnostic.isFatal === true,
-    });
-    res.writeHead(204, { 'cache-control': 'no-store' });
-    res.end();
-  });
-}
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -178,9 +75,6 @@ function serveManifest(platform, res) {
   }
 
   const manifest = fs.readFileSync(manifestPath, 'utf-8');
-  if (platform === 'android') {
-    writeStartupLog({ source: 'request', event: 'android_manifest_served' });
-  }
   res.writeHead(200, {
     'content-type': 'application/json',
     'expo-protocol-version': '1',
@@ -209,7 +103,6 @@ function serveLandingPage(req, res, landingPageTemplate, appName) {
 function serveStaticFile(urlPath, res) {
   const safePath = path.normalize(urlPath).replace(/^(\.\.(\/|\\|$))+/, '');
   const filePath = path.join(STATIC_ROOT, safePath);
-  const isAndroidBundle = urlPath.endsWith('/_expo/static/js/android/bundle.js');
 
   if (!filePath.startsWith(STATIC_ROOT)) {
     res.writeHead(403);
@@ -218,9 +111,6 @@ function serveStaticFile(urlPath, res) {
   }
 
   if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-    if (isAndroidBundle) {
-      writeStartupLog({ source: 'request', event: 'android_bundle_not_found' });
-    }
     res.writeHead(404);
     res.end('Not Found');
     return;
@@ -229,13 +119,6 @@ function serveStaticFile(urlPath, res) {
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME_TYPES[ext] || 'application/octet-stream';
   const content = fs.readFileSync(filePath);
-  if (isAndroidBundle) {
-    writeStartupLog({
-      source: 'request',
-      event: 'android_bundle_served',
-      bytes: content.length,
-    });
-  }
   res.writeHead(200, { 'content-type': contentType });
   res.end(content);
 }
@@ -249,10 +132,6 @@ const server = http.createServer((req, res) => {
 
   if (basePath && pathname.startsWith(basePath)) {
     pathname = pathname.slice(basePath.length) || '/';
-  }
-
-  if (pathname === STARTUP_DIAGNOSTIC_PATH) {
-    return receiveStartupDiagnostic(req, res);
   }
 
   if (pathname === '/' || pathname === '/manifest') {

@@ -4,4 +4,4 @@
 - [Prayer notification scheduling](prayer-notification-scheduling.md) — dated local alerts need a rolling window and clear renewal limits; do not use fixed daily repeats.
 - [Workspace package installation](workspace-package-installation.md) — the general package helper targets the pnpm root, not a filtered artifact; inspect config after failures.
 - [Expo Go startup diagnostics](expo-go-startup-diagnostics.md) — distinguish a missing optional Metro DevTools library from a JavaScript bundle failure; confirm Metro still starts.
-- [Expo Go regression triage](expo-go-regression-triage.md) — compare last-working resolved dependencies and source changes before changing the splash screen.
+- [Expo Go startup triage](expo-go-regression-triage.md) — compare dependency drift first; on Android, guard remote push registration because Expo Go throws when it is called.

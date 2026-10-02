@@ -8,3 +8,9 @@ For a previously working Expo Go launch, first compare the last known-working pu
 **Why:** A splash timeout was published without changing the Android screen, while the repository history exposed a nearby Expo package sync. The available server checks could not observe device-side JavaScript execution.
 
 **How to apply:** Establish the exact regression window, keep hypotheses separate from confirmed device evidence, and follow the Expo skill before changing SDK versions. Do not treat a successful build or hosted bundle as a runtime test.
+
+On Android, Expo Go does not support remote push notification registration; the Expo notifications package throws when this API is called. This is distinct from local scheduled notifications.
+
+**Why:** A confirmed startup failure occurred when Android Expo Go reached remote-push registration, despite the app bundle, fonts, and root layout loading successfully.
+
+**How to apply:** Guard only remote-push registration when running in Expo Go. Keep local scheduling available there, and retain remote registration for app builds that support it.
