@@ -1,5 +1,7 @@
 import React, { Component, ComponentType, PropsWithChildren } from 'react';
+import { Platform } from 'react-native';
 import { ErrorFallback, ErrorFallbackProps } from '@/components/ErrorFallback';
+import { reportStartupDiagnostic } from '@/lib/startupDiagnostics';
 
 export type ErrorBoundaryProps = PropsWithChildren<{
   FallbackComponent?: ComponentType<ErrorFallbackProps>;
@@ -29,6 +31,14 @@ export class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: { componentStack: string }): void {
+    if (Platform.OS === 'android') {
+      reportStartupDiagnostic({
+        stage: 'react_error_boundary',
+        name: error.name,
+        message: error.message,
+        stack: `${error.stack ?? ''}\n${info.componentStack}`,
+      });
+    }
     if (typeof this.props.onError === 'function') {
       this.props.onError(error, info.componentStack);
     }
