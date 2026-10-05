@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useMemo, useRef, useState } from 'react';
 import { AppState, Linking, Platform } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 import { getGetPrayerTimesQueryKey } from '@workspace/api-client-react';
 import { apiBaseUrl } from '@/lib/api-config';
@@ -11,6 +12,20 @@ import {
   PrayerDay,
   PrayerDataset,
 } from '@/lib/prayer';
+
+const PRAYER_CACHE_KEY = 'prayer-sverige:official-timetable:v1';
+const prayerQueryKey = getGetPrayerTimesQueryKey();
+
+type CachedPrayerDataset = { calendarYear: number; dataset: PrayerDataset };
+
+function isCachedPrayerDataset(value: unknown): value is CachedPrayerDataset {
+  if (!value || typeof value !== 'object') return false;
+  const cached = value as Partial<CachedPrayerDataset>;
+  return Number.isInteger(cached.calendarYear)
+    && !!cached.dataset
+    && Array.isArray(cached.dataset.cities)
+    && typeof cached.dataset.tables === 'object';
+}
 
 type Coordinates = { latitude: number; longitude: number };
 type WebPlace = { countryCode?: string };
@@ -35,6 +50,8 @@ type PrayerContextValue = {
 const PrayerContext = createContext<PrayerContextValue | null>(null);
 
 export function PrayerProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
+  const [tableCacheReady, setTableCacheReady] = useState(false);
   const [permission, requestPermission] = Location.useForegroundPermissions();
   const [city, setCity] = useState<string | null>(null);
   const [nearestDistanceKm, setNearestDistanceKm] = useState<number | null>(null);
@@ -50,8 +67,29 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
     const timer = setInterval(() => setDate(new Date()), 60_000);
     return () => clearInterval(timer);
   }, []);
+  React.useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const stored = await AsyncStorage.getItem(PRAYER_CACHE_KEY);
+        if (!active || !stored) return;
+        const cached: unknown = JSON.parse(stored);
+        if (isCachedPrayerDataset(cached) && cached.calendarYear === new Date().getFullYear()) {
+          queryClient.setQueryData(prayerQueryKey, cached.dataset, { updatedAt: 0 });
+        } else {
+          await AsyncStorage.removeItem(PRAYER_CACHE_KEY);
+        }
+      } catch {
+        await AsyncStorage.removeItem(PRAYER_CACHE_KEY).catch(() => undefined);
+      } finally {
+        if (active) setTableCacheReady(true);
+      }
+    })();
+    return () => { active = false; };
+  }, [queryClient]);
   const query = useQuery({
-    queryKey: getGetPrayerTimesQueryKey(),
+    queryKey: prayerQueryKey,
+    enabled: tableCacheReady,
     queryFn: async () => {
       const url = Platform.OS === 'web'
         ? `${apiBaseUrl ?? ''}/api/prayer-times`
@@ -60,10 +98,15 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       if (!response.ok) {
         throw new Error(`Bönetidstabellen kunde inte laddas (HTTP ${response.status}).`);
       }
-      return response.json();
+      const dataset = normalizePrayerDataset(await response.json());
+      void AsyncStorage.setItem(PRAYER_CACHE_KEY, JSON.stringify({
+        calendarYear: new Date().getFullYear(),
+        dataset,
+      })).catch(() => undefined);
+      return dataset;
     },
-    select: normalizePrayerDataset,
     staleTime: 1000 * 60 * 60 * 12,
+    refetchOnMount: 'always',
     retry: 2,
   });
 
@@ -144,7 +187,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
   // Locate once when the page opens, then refresh GPS whenever the app returns
   // to the foreground after location access has been granted.
   React.useEffect(() => {
-    if (!permission || autoLocateStartedRef.current) return;
+    if (!permission || !tableCacheReady || autoLocateStartedRef.current) return;
     if (!permission.granted && (Platform.OS === 'web' || permission.status !== 'undetermined')) return;
     autoLocateStartedRef.current = true;
     void locate();
@@ -192,7 +235,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       today,
       tomorrow,
       month,
-      loading: query.isLoading,
+      loading: !tableCacheReady || query.isLoading,
       locating,
       error: locationError ?? (query.error instanceof Error ? query.error.message : null),
       permission,
@@ -208,7 +251,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       },
       refresh: query.refetch,
     }),
-    [query.data, query.isLoading, query.error, query.refetch, city, nearestDistanceKm, coordinates, today, tomorrow, month, locating, locationError, permission],
+    [query.data, tableCacheReady, query.isLoading, query.error, query.refetch, city, nearestDistanceKm, coordinates, today, tomorrow, month, locating, locationError, permission],
   );
   return <PrayerContext.Provider value={value}>{children}</PrayerContext.Provider>;
 }

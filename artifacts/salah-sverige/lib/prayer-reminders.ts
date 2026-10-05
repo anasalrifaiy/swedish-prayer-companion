@@ -2,29 +2,29 @@ import type { PrayerDataset, PrayerName } from './prayer';
 
 export const reminderPrayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'] as const;
 export type ReminderPrayer = Exclude<PrayerName, 'Shuruk'>;
-export type ReminderMode = 'vibration' | 'sound';
+export type ReminderMode = 'off' | 'vibration' | 'sound';
 export type ReminderPreferences = {
-  enabled: boolean;
-  mode: ReminderMode;
-  prayers: Record<ReminderPrayer, boolean>;
+  prayers: Record<ReminderPrayer, ReminderMode>;
 };
 
 export const defaultReminderPreferences: ReminderPreferences = {
-  enabled: false,
-  mode: 'vibration',
-  prayers: { Fajr: true, Dhuhr: true, Asr: true, Maghrib: true, Isha: true },
+  prayers: { Fajr: 'off', Dhuhr: 'off', Asr: 'off', Maghrib: 'off', Isha: 'off' },
 };
 
 export function readReminderPreferences(value: string | null): ReminderPreferences {
   if (!value) return defaultReminderPreferences;
   try {
     const parsed = JSON.parse(value);
+    const legacyMode = parsed.mode === 'sound' ? 'sound' : 'vibration';
     return {
-      enabled: parsed.enabled === true,
-      mode: parsed.mode === 'sound' ? 'sound' : 'vibration',
       prayers: Object.fromEntries(
-        reminderPrayers.map((name) => [name, parsed.prayers?.[name] !== false]),
-      ) as Record<ReminderPrayer, boolean>,
+        reminderPrayers.map((name) => {
+          const mode = parsed.prayers?.[name];
+          if (mode === 'vibration' || mode === 'sound' || mode === 'off') return [name, mode];
+          if (mode === true && parsed.enabled === true) return [name, legacyMode];
+          return [name, 'off'];
+        }),
+      ) as Record<ReminderPrayer, ReminderMode>,
     };
   } catch {
     return defaultReminderPreferences;

@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { AppState, Linking, Platform } from 'react-native';
-import { isRunningInExpoGo } from 'expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAllScheduledNotificationsAsync } from 'expo-notifications/build/getAllScheduledNotificationsAsync';
 import { getPermissionsAsync, requestPermissionsAsync } from 'expo-notifications/build/NotificationPermissions';
@@ -10,19 +9,17 @@ import { SchedulableTriggerInputTypes } from 'expo-notifications/build/Notificat
 import { cancelScheduledNotificationAsync } from 'expo-notifications/build/cancelScheduledNotificationAsync';
 import { scheduleNotificationAsync } from 'expo-notifications/build/scheduleNotificationAsync';
 import { setNotificationChannelAsync } from 'expo-notifications/build/setNotificationChannelAsync';
-import Constants from 'expo-constants';
-import { saveReminderDevice } from '@workspace/api-client-react';
-import { apiBaseUrl } from '@/lib/api-config';
 import { usePrayer } from './PrayerContext';
 import {
   defaultReminderPreferences,
   readReminderPreferences,
+  reminderPrayers,
+  ReminderPrayer,
   ReminderPreferences,
   upcomingPrayerReminders,
 } from '@/lib/prayer-reminders';
 
 const STORAGE_KEY = 'prayer-sverige:reminders:v1';
-const PUSH_TOKEN_KEY = 'prayer-sverige:push-token:v1';
 const OWNER = 'prayer-sverige';
 const VIBRATION_CHANNEL = 'prayer-vibration-v1';
 const SOUND_CHANNEL = 'prayer-sound-v1';
@@ -36,13 +33,12 @@ type ReminderContextValue = {
   error: string | null;
   scheduledCount: number | null;
   scheduledUntil: Date | null;
-  pushActive: boolean;
   updatePreferences: (next: ReminderPreferences) => Promise<void>;
   openSettings: () => Promise<void>;
 };
 
 const ReminderContext = createContext<ReminderContextValue | null>(null);
-let foregroundMode: ReminderPreferences['mode'] = 'vibration';
+let foregroundModes: ReminderPreferences['prayers'] = defaultReminderPreferences.prayers;
 
 const LocalNotifications = {
   AndroidImportance,
@@ -57,12 +53,15 @@ const LocalNotifications = {
 
 function notificationModule() {
   setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: foregroundMode === 'sound',
-      shouldSetBadge: false,
-    }),
+    handleNotification: async (notification) => {
+      const prayer = notification.request.content.data?.prayer as ReminderPrayer | undefined;
+      return {
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: prayer ? foregroundModes[prayer] === 'sound' : false,
+        shouldSetBadge: false,
+      };
+    },
   });
   return LocalNotifications;
 }
@@ -100,7 +99,6 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [scheduledCount, setScheduledCount] = useState<number | null>(null);
   const [scheduledUntil, setScheduledUntil] = useState<Date | null>(null);
-  const [pushActive, setPushActive] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const queue = useRef<Promise<void>>(Promise.resolve());
 
@@ -140,25 +138,18 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
     const snapshot = { preferences, city, dataset, locationError };
     queue.current = queue.current.catch(() => undefined).then(async () => {
       let schedulingStarted = false;
-      let localComplete = false;
       try {
         const Notifications = await notificationModule();
-        foregroundMode = snapshot.preferences.mode;
+        foregroundModes = snapshot.preferences.prayers;
         const status = await Notifications.getPermissionsAsync();
         setPermissionGranted(status.granted);
-        const disableRemote = async () => {
-          const token = await AsyncStorage.getItem(PUSH_TOKEN_KEY);
-          if (apiBaseUrl && token) await saveReminderDevice({
-            token, enabled: false, city: snapshot.city ?? '', mode: snapshot.preferences.mode,
-            prayers: snapshot.preferences.prayers, localUntil: new Date().toISOString(),
-          });
-          setPushActive(false);
-        };
-        if (!snapshot.preferences.enabled) {
+        const selectedPrayers = Object.fromEntries(
+          reminderPrayers.map((name) => [name, snapshot.preferences.prayers[name] !== 'off']),
+        ) as Record<ReminderPrayer, boolean>;
+        if (!Object.values(selectedPrayers).some(Boolean)) {
           await cancelOurReminders(Notifications);
           setScheduledCount(0);
           setScheduledUntil(null);
-          await disableRemote();
           setError(null);
           return;
         }
@@ -166,13 +157,11 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
           await cancelOurReminders(Notifications);
           setScheduledCount(0);
           setScheduledUntil(null);
-          await disableRemote();
           setError('Tillåt aviseringar i telefonens inställningar för att få påminnelser.');
           return;
         }
         if (!snapshot.city || !snapshot.dataset) {
           if (!snapshot.city && snapshot.locationError?.includes('utanför Sverige')) {
-            await disableRemote();
             await cancelOurReminders(Notifications);
             setScheduledCount(0);
             setScheduledUntil(null);
@@ -184,85 +173,42 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
         // Local date triggers use the phone's time zone. Abroad, deliver in Swedish time via push only.
         const inSwedenTime = Intl.DateTimeFormat().resolvedOptions().timeZone === 'Europe/Stockholm';
         const reminders = inSwedenTime ? upcomingPrayerReminders(
-          snapshot.dataset, snapshot.city, snapshot.preferences.prayers, new Date(), LOOKAHEAD_DAYS,
+          snapshot.dataset, snapshot.city, selectedPrayers, new Date(), LOOKAHEAD_DAYS,
         ) : [];
         await cancelOurReminders(Notifications);
         schedulingStarted = true;
-        const channelId = snapshot.preferences.mode === 'sound' ? SOUND_CHANNEL : VIBRATION_CHANNEL;
         for (const { prayer, date } of reminders) {
+          const mode = snapshot.preferences.prayers[prayer];
           await Notifications.scheduleNotificationAsync({
             content: {
               title: `${prayer} · ${snapshot.city}`,
               body: `Det är dags för ${prayer} enligt tabellen för ${snapshot.city}.`,
-              sound: snapshot.preferences.mode === 'sound' ? 'default' : false,
+              sound: mode === 'sound' ? 'default' : false,
               data: { owner: OWNER, city: snapshot.city, prayer },
             },
             trigger: {
               type: Notifications.SchedulableTriggerInputTypes.DATE,
               date,
-              ...(Platform.OS === 'android' ? { channelId } : {}),
+              ...(Platform.OS === 'android' ? {
+                channelId: mode === 'sound' ? SOUND_CHANNEL : VIBRATION_CHANNEL,
+              } : {}),
             },
           });
         }
         setScheduledCount(reminders.length);
         setScheduledUntil(reminders.at(-1)?.date ?? null);
-        localComplete = true;
-        const needsPush = Object.values(snapshot.preferences.prayers).some(Boolean);
-        if (needsPush && !apiBaseUrl) {
-          setPushActive(false);
-          setError(inSwedenTime
-            ? null
-            : 'Påminnelser utanför svensk tidszon kräver en ansluten aviseringstjänst.');
-          return;
-        }
-        if (needsPush) {
-          if (Platform.OS === 'android' && isRunningInExpoGo()) {
-            await disableRemote();
-            setError(inSwedenTime
-              ? null
-              : 'Expo Go stöder inte pushaviseringar på Android. Aviseringar utanför svensk tidszon kräver en installerad appversion.');
-            return;
-          }
-          const projectId = Constants.easConfig?.projectId ?? Constants.expoConfig?.extra?.eas?.projectId;
-          if (!projectId) throw new Error('Push needs an Expo project ID in a native build');
-          const { getExpoPushTokenAsync } = await import('expo-notifications/build/getExpoPushTokenAsync');
-          const token = (await getExpoPushTokenAsync({ projectId })).data;
-          const oldToken = await AsyncStorage.getItem(PUSH_TOKEN_KEY);
-          if (oldToken && oldToken !== token) {
-            await saveReminderDevice({
-              token: oldToken, enabled: false, city: snapshot.city, mode: snapshot.preferences.mode,
-              prayers: snapshot.preferences.prayers, localUntil: new Date().toISOString(),
-            });
-          }
-          await AsyncStorage.setItem(PUSH_TOKEN_KEY, token);
-          await saveReminderDevice({
-            token, enabled: true, city: snapshot.city, mode: snapshot.preferences.mode,
-            prayers: snapshot.preferences.prayers,
-            localUntil: (reminders.at(-1)?.date ?? new Date()).toISOString(),
-          });
-          setPushActive(true);
-        } else {
-          await disableRemote();
-        }
-        setError(null);
+        setError(inSwedenTime ? null : 'Lokala påminnelser fungerar bara i svensk tidszon.');
       } catch (cause) {
         if (__DEV__) console.error(
           'Reminder update failed:',
           cause instanceof Error ? cause.stack ?? cause.message : cause,
         );
-        if (schedulingStarted && !localComplete) {
+        if (schedulingStarted) {
           try { await cancelOurReminders(await notificationModule()); } catch { /* preserve the original error */ }
           setScheduledCount(null);
           setScheduledUntil(null);
         }
-        setPushActive(false);
-        const needsNativeSetup = cause instanceof Error
-          && cause.message.includes('Expo project ID');
-        setError(localComplete
-          ? needsNativeSetup
-            ? 'Lokala aviseringar är planerade, men långtidsaviseringar kräver en push-konfigurerad app med Expo-projekt-ID.'
-            : 'Lokala aviseringar är planerade, men långtidsaviseringar kunde inte aktiveras. Kontrollera nätanslutningen och att appen är installerad som en push-aktiverad version.'
-          : 'Påminnelser kunde inte uppdateras. Försök öppna appen igen.');
+        setError('Påminnelser kunde inte uppdateras. Kontrollera aviseringsbehörigheten och försök igen.');
       }
     });
   }, [loading, preferences, city, dataset, locationError, refresh]);
@@ -271,7 +217,9 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
     if (saving || loading || Platform.OS === 'web') return;
     setSaving(true);
     try {
-      if (next.enabled && !preferences.enabled) {
+      const enabling = Object.values(next.prayers).some((mode) => mode !== 'off')
+        && !Object.values(preferences.prayers).some((mode) => mode !== 'off');
+      if (enabling) {
         const Notifications = await notificationModule();
         await ensureChannels(Notifications);
         const current = await Notifications.getPermissionsAsync();
@@ -294,7 +242,7 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ReminderContext.Provider value={{
-      preferences, loading, saving, permissionGranted, error, scheduledCount, scheduledUntil, pushActive,
+      preferences, loading, saving, permissionGranted, error, scheduledCount, scheduledUntil,
       updatePreferences,
       openSettings: async () => {
         if (Platform.OS !== 'web') {

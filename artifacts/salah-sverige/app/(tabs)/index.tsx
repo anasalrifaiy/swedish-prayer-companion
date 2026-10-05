@@ -33,15 +33,12 @@ export default function TodayScreen() {
   const state = getPrayerState(today, now, tomorrow);
   const date = new Intl.DateTimeFormat('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' }).format(now);
   const webTop = Platform.OS === 'web' ? 67 : 0;
-  const toggleReminder = (name: ReminderPrayer) => {
-    const currentlyOn = reminders.enabled && reminders.prayers[name];
-    const selected = reminders.enabled
-      ? { ...reminders.prayers, [name]: !currentlyOn }
-      : { Fajr: false, Dhuhr: false, Asr: false, Maghrib: false, Isha: false, [name]: true };
+  const cycleReminderMode = (name: ReminderPrayer) => {
+    const current = reminders.prayers[name];
+    const next = current === 'off' ? 'vibration' : current === 'vibration' ? 'sound' : 'off';
     void updatePreferences({
       ...reminders,
-      enabled: Object.values(selected).some(Boolean),
-      prayers: selected,
+      prayers: { ...reminders.prayers, [name]: next },
     });
   };
 
@@ -128,7 +125,7 @@ export default function TodayScreen() {
               <Text style={[styles.reminderHint, { color: colors.mutedForeground }]}>
                 {Platform.OS === 'web'
                   ? 'Böneaviseringar kan slås på i mobilappen.'
-                  : `Tryck på klockan för avisering · ${reminders.mode === 'sound' ? 'ljud' : 'vibration'}`}
+                  : 'Tryck på ikonen för att växla mellan av, vibration och ljud.'}
               </Text>
               {!!reminderError && <Text style={[styles.reminderError, { color: colors.destructive }]}>{reminderError}</Text>}
               {reminderPermission === false && Platform.OS !== 'web' && !!reminderError && (
@@ -138,7 +135,8 @@ export default function TodayScreen() {
               )}
               {prayers.map((name, index) => {
                  const active = state.next?.name === name && state.next.time.getDate() === now.getDate();
-                  const reminderOn = name !== 'Shuruk' && reminders.enabled && reminders.prayers[name];
+                  const reminderMode = name === 'Shuruk' ? 'off' : reminders.prayers[name];
+                  const reminderOn = reminderMode !== 'off';
                 return (
                   <View key={name} style={[styles.prayerRow, index < prayers.length - 1 && { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
                     <View style={[styles.prayerIcon, { backgroundColor: active ? colors.primary : colors.muted }]}>
@@ -149,11 +147,12 @@ export default function TodayScreen() {
                     {name !== 'Shuruk' && (
                       <Pressable
                         testID={`today-reminder-${name}`}
-                        accessibilityRole="switch"
-                        accessibilityLabel={`Påminnelse för ${swedishPrayerNames[name]}`}
-                        accessibilityState={{ checked: reminderOn, disabled: remindersLoading || remindersSaving || Platform.OS === 'web' }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Påminnelse för ${swedishPrayerNames[name]}: ${reminderMode === 'off' ? 'av' : reminderMode === 'vibration' ? 'vibration' : 'ljud'}`}
+                        accessibilityHint="Tryck för att växla mellan av, vibration och ljud."
+                        accessibilityState={{ disabled: remindersLoading || remindersSaving || Platform.OS === 'web' }}
                         disabled={remindersLoading || remindersSaving || Platform.OS === 'web'}
-                        onPress={() => toggleReminder(name)}
+                        onPress={() => cycleReminderMode(name)}
                         hitSlop={3}
                         style={({ pressed }) => [
                           styles.reminderButton,
@@ -161,7 +160,9 @@ export default function TodayScreen() {
                           pressed && styles.pressed,
                         ]}
                       >
-                        <Feather name={reminderOn ? 'bell' : 'bell-off'} size={17} color={reminderOn ? colors.primary : colors.mutedForeground} />
+                        {reminderMode === 'vibration'
+                          ? <MaterialCommunityIcons name="vibrate" size={19} color={colors.primary} />
+                          : <Feather name={reminderMode === 'sound' ? 'volume-2' : 'bell-off'} size={17} color={reminderOn ? colors.primary : colors.mutedForeground} />}
                       </Pressable>
                     )}
                   </View>
