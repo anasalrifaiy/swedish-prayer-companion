@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -10,6 +10,8 @@ import { useReminders } from '@/context/ReminderContext';
 import { getPrayerState, prayers, swedishPrayerNames } from '@/lib/prayer';
 import type { ReminderPrayer } from '@/lib/prayer-reminders';
 import { useColors } from '@/hooks/useColors';
+
+const PRIVACY_POLICY_URL = 'https://github.com/anasalrifaiy/swedish-prayer-companion/blob/main/PRIVACY_POLICY.md';
 
 function formatDuration(seconds: number) {
   const h = Math.floor(seconds / 3600);
@@ -173,6 +175,13 @@ export default function TodayScreen() {
             {nearestDistanceKm !== null && (
               <Text style={[styles.coordinateSource, { color: colors.mutedForeground }]}>Stadspositioner: GeoNames.org (CC BY 4.0)</Text>
             )}
+            <Pressable
+              accessibilityRole="link"
+              onPress={() => { void Linking.openURL(PRIVACY_POLICY_URL); }}
+              style={styles.privacyLink}
+            >
+              <Text style={[styles.coordinateSource, { color: colors.primary }]}>Integritetspolicy</Text>
+            </Pressable>
           </>
         )}
       </ScrollView>
@@ -213,6 +222,7 @@ const styles = StyleSheet.create({
   reminderButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginLeft: 10 },
   source: { textAlign: 'center', fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 15 },
   coordinateSource: { textAlign: 'center', fontFamily: 'Inter_400Regular', fontSize: 10, marginTop: 4 },
+  privacyLink: { alignSelf: 'center', padding: 8 },
   permissionCard: { borderRadius: 28, padding: 24, alignItems: 'center', marginTop: 54 },
   permissionIcon: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   permissionTitle: { fontFamily: 'Inter_700Bold', fontSize: 23, textAlign: 'center' },
