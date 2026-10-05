@@ -67,6 +67,7 @@ catalog:
   zod: ^3.25.76
 
 autoInstallPeers: false
+virtualStoreDirMaxLength: 16
 
 patchedDependencies:
   query-string@7.1.3: patches/query-string@7.1.3.patch
