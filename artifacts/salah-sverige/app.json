@@ -20,7 +20,7 @@
         "ACCESS_FINE_LOCATION",
         "POST_NOTIFICATIONS"
       ],
-      "package": "com.prayers.app"
+      "package": "com.anasalrifaiy.prayersverige"
     },
     "web": {
       "favicon": "./assets/images/icon.png"
