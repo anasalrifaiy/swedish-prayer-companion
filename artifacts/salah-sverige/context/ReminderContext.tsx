@@ -12,6 +12,7 @@ import { scheduleNotificationAsync } from 'expo-notifications/build/scheduleNoti
 import { setNotificationChannelAsync } from 'expo-notifications/build/setNotificationChannelAsync';
 import Constants from 'expo-constants';
 import { saveReminderDevice } from '@workspace/api-client-react';
+import { apiBaseUrl } from '@/lib/api-config';
 import { usePrayer } from './PrayerContext';
 import {
   defaultReminderPreferences,
@@ -147,7 +148,7 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
         setPermissionGranted(status.granted);
         const disableRemote = async () => {
           const token = await AsyncStorage.getItem(PUSH_TOKEN_KEY);
-          if (token) await saveReminderDevice({
+          if (apiBaseUrl && token) await saveReminderDevice({
             token, enabled: false, city: snapshot.city ?? '', mode: snapshot.preferences.mode,
             prayers: snapshot.preferences.prayers, localUntil: new Date().toISOString(),
           });
@@ -206,7 +207,15 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
         setScheduledCount(reminders.length);
         setScheduledUntil(reminders.at(-1)?.date ?? null);
         localComplete = true;
-        if (Object.values(snapshot.preferences.prayers).some(Boolean)) {
+        const needsPush = Object.values(snapshot.preferences.prayers).some(Boolean);
+        if (needsPush && !apiBaseUrl) {
+          setPushActive(false);
+          setError(inSwedenTime
+            ? null
+            : 'Påminnelser utanför svensk tidszon kräver en ansluten aviseringstjänst.');
+          return;
+        }
+        if (needsPush) {
           if (Platform.OS === 'android' && isRunningInExpoGo()) {
             await disableRemote();
             setError(inSwedenTime

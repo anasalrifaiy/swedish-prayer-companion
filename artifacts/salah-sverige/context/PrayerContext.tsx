@@ -1,10 +1,13 @@
 import React, { createContext, useContext, useMemo, useRef, useState } from 'react';
 import { AppState, Linking, Platform } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
 import * as Location from 'expo-location';
-import { getGetPrayerTimesQueryKey, useGetPrayerTimes } from '@workspace/api-client-react';
+import { getGetPrayerTimesQueryKey } from '@workspace/api-client-react';
+import { apiBaseUrl } from '@/lib/api-config';
 import {
   nearestSupportedCity,
   normalizePrayerDataset,
+  PRAYER_DATA_URL,
   PrayerDay,
   PrayerDataset,
 } from '@/lib/prayer';
@@ -47,13 +50,21 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
     const timer = setInterval(() => setDate(new Date()), 60_000);
     return () => clearInterval(timer);
   }, []);
-  const query = useGetPrayerTimes({
-    query: {
-      queryKey: getGetPrayerTimesQueryKey(),
-      select: normalizePrayerDataset,
-      staleTime: 1000 * 60 * 60 * 12,
-      retry: 2,
+  const query = useQuery({
+    queryKey: getGetPrayerTimesQueryKey(),
+    queryFn: async () => {
+      const url = Platform.OS === 'web'
+        ? `${apiBaseUrl ?? ''}/api/prayer-times`
+        : PRAYER_DATA_URL;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Bönetidstabellen kunde inte laddas (HTTP ${response.status}).`);
+      }
+      return response.json();
     },
+    select: normalizePrayerDataset,
+    staleTime: 1000 * 60 * 60 * 12,
+    retry: 2,
   });
 
   const locate = async () => {

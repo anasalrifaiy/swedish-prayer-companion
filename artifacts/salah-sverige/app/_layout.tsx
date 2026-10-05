@@ -4,6 +4,7 @@ import { setBaseUrl } from '@workspace/api-client-react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { apiBaseUrl } from '@/lib/api-config';
 import { PrayerProvider } from '@/context/PrayerContext';
 import { ReminderProvider } from '@/context/ReminderContext';
 import {
@@ -17,12 +18,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 
 SplashScreen.preventAutoHideAsync();
-setBaseUrl(
-  process.env.EXPO_PUBLIC_API_URL ??
-    (process.env.EXPO_PUBLIC_DOMAIN
-      ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
-      : null),
-);
+setBaseUrl(apiBaseUrl);
 const queryClient = new QueryClient();
 
 export default function RootLayout() {
