@@ -23,5 +23,7 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
-  startReminderDelivery();
+  if (process.env.DISABLE_REMINDER_DELIVERY !== "true") {
+    startReminderDelivery();
+  }
 });

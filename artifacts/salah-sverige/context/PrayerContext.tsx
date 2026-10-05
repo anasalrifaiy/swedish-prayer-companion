@@ -134,8 +134,9 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
   // to the foreground after location access has been granted.
   React.useEffect(() => {
     if (!permission || autoLocateStartedRef.current) return;
+    if (!permission.granted && (Platform.OS === 'web' || permission.status !== 'undetermined')) return;
     autoLocateStartedRef.current = true;
-    if (permission.granted || permission.status === 'undetermined') void locate();
+    void locate();
   }, [permission?.status, permission?.granted]);
   const locateRef = useRef(locate);
   locateRef.current = locate;

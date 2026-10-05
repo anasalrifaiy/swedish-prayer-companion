@@ -2,7 +2,14 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { AppState, Linking, Platform } from 'react-native';
 import { isRunningInExpoGo } from 'expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type * as NotificationTypes from 'expo-notifications';
+import { getAllScheduledNotificationsAsync } from 'expo-notifications/build/getAllScheduledNotificationsAsync';
+import { getPermissionsAsync, requestPermissionsAsync } from 'expo-notifications/build/NotificationPermissions';
+import { setNotificationHandler } from 'expo-notifications/build/NotificationsHandler';
+import { AndroidImportance } from 'expo-notifications/build/NotificationChannelManager.types';
+import { SchedulableTriggerInputTypes } from 'expo-notifications/build/Notifications.types';
+import { cancelScheduledNotificationAsync } from 'expo-notifications/build/cancelScheduledNotificationAsync';
+import { scheduleNotificationAsync } from 'expo-notifications/build/scheduleNotificationAsync';
+import { setNotificationChannelAsync } from 'expo-notifications/build/setNotificationChannelAsync';
 import Constants from 'expo-constants';
 import { saveReminderDevice } from '@workspace/api-client-react';
 import { usePrayer } from './PrayerContext';
@@ -36,9 +43,19 @@ type ReminderContextValue = {
 const ReminderContext = createContext<ReminderContextValue | null>(null);
 let foregroundMode: ReminderPreferences['mode'] = 'vibration';
 
-async function notificationModule() {
-  const Notifications = await import('expo-notifications');
-  Notifications.setNotificationHandler({
+const LocalNotifications = {
+  AndroidImportance,
+  SchedulableTriggerInputTypes,
+  cancelScheduledNotificationAsync,
+  getAllScheduledNotificationsAsync,
+  getPermissionsAsync,
+  requestPermissionsAsync,
+  scheduleNotificationAsync,
+  setNotificationChannelAsync,
+};
+
+function notificationModule() {
+  setNotificationHandler({
     handleNotification: async () => ({
       shouldShowBanner: true,
       shouldShowList: true,
@@ -46,31 +63,31 @@ async function notificationModule() {
       shouldSetBadge: false,
     }),
   });
-  return Notifications;
+  return LocalNotifications;
 }
 
-async function ensureChannels(Notifications: typeof NotificationTypes) {
+async function ensureChannels(notificationApi: typeof LocalNotifications) {
   if (Platform.OS !== 'android') return;
-  await Notifications.setNotificationChannelAsync(VIBRATION_CHANNEL, {
+  await notificationApi.setNotificationChannelAsync(VIBRATION_CHANNEL, {
     name: 'Bönetider · vibration',
-    importance: Notifications.AndroidImportance.HIGH,
+    importance: notificationApi.AndroidImportance.HIGH,
     sound: null,
     enableVibrate: true,
     vibrationPattern: [0, 450, 200, 450],
   });
-  await Notifications.setNotificationChannelAsync(SOUND_CHANNEL, {
+  await notificationApi.setNotificationChannelAsync(SOUND_CHANNEL, {
     name: 'Bönetider · ljud',
-    importance: Notifications.AndroidImportance.HIGH,
+    importance: notificationApi.AndroidImportance.HIGH,
     sound: 'default',
     enableVibrate: false,
   });
 }
 
-async function cancelOurReminders(Notifications: typeof NotificationTypes) {
-  const pending = await Notifications.getAllScheduledNotificationsAsync();
+async function cancelOurReminders(notificationApi: typeof LocalNotifications) {
+  const pending = await notificationApi.getAllScheduledNotificationsAsync();
   await Promise.all(pending
     .filter((item) => item.content.data?.owner === OWNER)
-    .map((item) => Notifications.cancelScheduledNotificationAsync(item.identifier)));
+    .map((item) => notificationApi.cancelScheduledNotificationAsync(item.identifier)));
 }
 
 export function ReminderProvider({ children }: { children: React.ReactNode }) {
@@ -199,7 +216,8 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
           }
           const projectId = Constants.easConfig?.projectId ?? Constants.expoConfig?.extra?.eas?.projectId;
           if (!projectId) throw new Error('Push needs an Expo project ID in a native build');
-          const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+          const { getExpoPushTokenAsync } = await import('expo-notifications/build/getExpoPushTokenAsync');
+          const token = (await getExpoPushTokenAsync({ projectId })).data;
           const oldToken = await AsyncStorage.getItem(PUSH_TOKEN_KEY);
           if (oldToken && oldToken !== token) {
             await saveReminderDevice({
@@ -219,6 +237,10 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
         }
         setError(null);
       } catch (cause) {
+        if (__DEV__) console.error(
+          'Reminder update failed:',
+          cause instanceof Error ? cause.stack ?? cause.message : cause,
+        );
         if (schedulingStarted && !localComplete) {
           try { await cancelOurReminders(await notificationModule()); } catch { /* preserve the original error */ }
           setScheduledCount(null);
