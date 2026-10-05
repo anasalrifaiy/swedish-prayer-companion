@@ -191,7 +191,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
     if (!permission.granted && (Platform.OS === 'web' || permission.status !== 'undetermined')) return;
     autoLocateStartedRef.current = true;
     void locate();
-  }, [permission?.status, permission?.granted]);
+  }, [permission?.status, permission?.granted, tableCacheReady]);
   const locateRef = useRef(locate);
   locateRef.current = locate;
   React.useEffect(() => {
