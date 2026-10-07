@@ -91,7 +91,13 @@ async function cancelOurReminders(notificationApi: typeof LocalNotifications) {
 }
 
 export function ReminderProvider({ children }: { children: React.ReactNode }) {
-  const { city, dataset, error: locationError } = usePrayer();
+  const {
+    city,
+    dataset,
+    error: locationError,
+    loading: prayerLoading,
+    locating,
+  } = usePrayer();
   const [preferences, setPreferences] = useState(defaultReminderPreferences);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -134,7 +140,7 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (loading || Platform.OS === 'web') return;
+    if (loading || prayerLoading || (locating && !city) || Platform.OS === 'web') return;
     const snapshot = { preferences, city, dataset, locationError };
     queue.current = queue.current.catch(() => undefined).then(async () => {
       let schedulingStarted = false;
@@ -211,7 +217,7 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
         setError('Påminnelser kunde inte uppdateras. Kontrollera aviseringsbehörigheten och försök igen.');
       }
     });
-  }, [loading, preferences, city, dataset, locationError, refresh]);
+  }, [loading, prayerLoading, locating, preferences, city, dataset, locationError, refresh]);
 
   const updatePreferences = async (next: ReminderPreferences) => {
     if (saving || loading || Platform.OS === 'web') return;
