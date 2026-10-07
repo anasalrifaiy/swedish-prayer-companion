@@ -14,9 +14,12 @@ import {
 } from '@/lib/prayer';
 
 const PRAYER_CACHE_KEY = 'prayer-sverige:official-timetable:v1';
+const LOCATION_CACHE_KEY = 'prayer-sverige:location:v1';
 const prayerQueryKey = getGetPrayerTimesQueryKey();
 
 type CachedPrayerDataset = { calendarYear: number; dataset: PrayerDataset };
+type LocationMode = 'automatic' | 'manual';
+type CachedLocation = { version: 1; city: string | null; mode: LocationMode };
 
 function isCachedPrayerDataset(value: unknown): value is CachedPrayerDataset {
   if (!value || typeof value !== 'object') return false;
@@ -25,6 +28,14 @@ function isCachedPrayerDataset(value: unknown): value is CachedPrayerDataset {
     && !!cached.dataset
     && Array.isArray(cached.dataset.cities)
     && typeof cached.dataset.tables === 'object';
+}
+
+function isCachedLocation(value: unknown): value is CachedLocation {
+  if (!value || typeof value !== 'object') return false;
+  const cached = value as Partial<CachedLocation>;
+  return cached.version === 1
+    && (cached.city === null || typeof cached.city === 'string')
+    && (cached.mode === 'automatic' || cached.mode === 'manual');
 }
 
 type Coordinates = { latitude: number; longitude: number };
@@ -54,6 +65,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
   const [tableCacheReady, setTableCacheReady] = useState(false);
   const [permission, requestPermission] = Location.useForegroundPermissions();
   const [city, setCity] = useState<string | null>(null);
+  const [locationMode, setLocationMode] = useState<LocationMode>('automatic');
   const [nearestDistanceKm, setNearestDistanceKm] = useState<number | null>(null);
   const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
   const [locating, setLocating] = useState(false);
@@ -72,15 +84,30 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
     void (async () => {
       try {
         const stored = await AsyncStorage.getItem(PRAYER_CACHE_KEY);
-        if (!active || !stored) return;
-        const cached: unknown = JSON.parse(stored);
-        if (isCachedPrayerDataset(cached) && cached.calendarYear === new Date().getFullYear()) {
-          queryClient.setQueryData(prayerQueryKey, cached.dataset, { updatedAt: 0 });
-        } else {
-          await AsyncStorage.removeItem(PRAYER_CACHE_KEY);
+        if (active && stored) {
+          const cached: unknown = JSON.parse(stored);
+          if (isCachedPrayerDataset(cached) && cached.calendarYear === new Date().getFullYear()) {
+            queryClient.setQueryData(prayerQueryKey, cached.dataset, { updatedAt: 0 });
+          } else {
+            await AsyncStorage.removeItem(PRAYER_CACHE_KEY);
+          }
         }
       } catch {
         await AsyncStorage.removeItem(PRAYER_CACHE_KEY).catch(() => undefined);
+      }
+      try {
+        const storedLocation = await AsyncStorage.getItem(LOCATION_CACHE_KEY);
+        if (active && storedLocation) {
+          const cachedLocation: unknown = JSON.parse(storedLocation);
+          if (isCachedLocation(cachedLocation)) {
+            setCity(cachedLocation.city);
+            setLocationMode(cachedLocation.mode);
+          } else {
+            await AsyncStorage.removeItem(LOCATION_CACHE_KEY);
+          }
+        }
+      } catch {
+        if (active) setLocationError('Den sparade staden kunde inte läsas. Hitta din plats eller välj stad igen.');
       } finally {
         if (active) setTableCacheReady(true);
       }
@@ -110,7 +137,28 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
     retry: 2,
   });
 
-  const locate = async () => {
+  React.useEffect(() => {
+    if (!tableCacheReady) return;
+    void AsyncStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify({
+      version: 1,
+      city,
+      mode: locationMode,
+    } satisfies CachedLocation)).catch(() => {
+      setLocationError('Den valda staden kunde inte sparas på telefonen.');
+    });
+  }, [tableCacheReady, city, locationMode]);
+
+  React.useEffect(() => {
+    if (query.data && city && !query.data.cities.includes(city)) {
+      autoLocateStartedRef.current = false;
+      setCity(null);
+      setLocationMode('automatic');
+      setNearestDistanceKm(null);
+      setLocationError('Den sparade staden finns inte längre i tabellen. Hitta din plats eller välj stad igen.');
+    }
+  }, [query.data, city]);
+
+  const refreshLocation = async () => {
     if (locatingRef.current) return;
     locatingRef.current = true;
     const selectionAtStart = manualSelectionRef.current;
@@ -153,8 +201,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
         countryCode = places[0]?.isoCountryCode;
       }
       if (countryCode?.toUpperCase() !== 'SE') {
-        if (nearestDistanceKm !== null && manualSelectionRef.current === selectionAtStart) {
-          setCity(null);
+        if (manualSelectionRef.current === selectionAtStart) {
           setNearestDistanceKm(null);
         }
         setLocationError(countryCode
@@ -183,21 +230,25 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       setLocating(false);
     }
   };
+  const locate = () => {
+    setLocationMode('automatic');
+    return refreshLocation();
+  };
 
   // Locate once when the page opens, then refresh GPS whenever the app returns
   // to the foreground after location access has been granted.
   React.useEffect(() => {
-    if (!permission || !tableCacheReady || autoLocateStartedRef.current) return;
+    if (locationMode !== 'automatic' || !permission || !tableCacheReady || autoLocateStartedRef.current) return;
     if (!permission.granted && (Platform.OS === 'web' || permission.status !== 'undetermined')) return;
     autoLocateStartedRef.current = true;
-    void locate();
-  }, [permission?.status, permission?.granted, tableCacheReady]);
-  const locateRef = useRef(locate);
-  locateRef.current = locate;
+    void refreshLocation();
+  }, [permission?.status, permission?.granted, tableCacheReady, locationMode]);
+  const locateRef = useRef(refreshLocation);
+  locateRef.current = refreshLocation;
   React.useEffect(() => {
     if (Platform.OS === 'web') {
       const refreshOnFocus = () => {
-        if ((permission?.granted || hasLocationAccessRef.current) && autoLocateStartedRef.current) void locateRef.current();
+        if (locationMode === 'automatic' && (permission?.granted || hasLocationAccessRef.current) && autoLocateStartedRef.current) void locateRef.current();
       };
       const refreshOnVisible = () => {
         if (document.visibilityState === 'visible') refreshOnFocus();
@@ -211,13 +262,16 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
     }
     let previousState = AppState.currentState;
     const subscription = AppState.addEventListener('change', (nextState) => {
-      if (previousState !== 'active' && nextState === 'active' && (permission?.granted || hasLocationAccessRef.current)) {
+      if (locationMode === 'automatic'
+        && previousState !== 'active'
+        && nextState === 'active'
+        && (permission?.granted || hasLocationAccessRef.current)) {
         void locateRef.current();
       }
       previousState = nextState;
     });
     return () => subscription.remove();
-  }, [permission?.granted]);
+  }, [permission?.granted, locationMode]);
 
   const month = city ? query.data?.tables[city]?.[String(date.getMonth() + 1)] ?? [] : [];
   const today = month.find((day) => day.day === date.getDate());
@@ -243,6 +297,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       selectCity: (selectedCity) => {
         manualSelectionRef.current += 1;
         setCity(selectedCity);
+        setLocationMode('manual');
         setNearestDistanceKm(null);
         setLocationError(null);
       },
