@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Location from 'expo-location';
 import { getGetPrayerTimesQueryKey } from '@workspace/api-client-react';
+import { useLanguage } from '@/context/LanguageContext';
 import { apiBaseUrl } from '@/lib/api-config';
 import {
   nearestSupportedCity,
@@ -16,6 +17,17 @@ import {
 const PRAYER_CACHE_KEY = 'prayer-sverige:official-timetable:v1';
 const LOCATION_CACHE_KEY = 'prayer-sverige:location:v1';
 const prayerQueryKey = getGetPrayerTimesQueryKey();
+
+export type LocationErrorKey =
+  | 'errSavedCityRead' | 'errSavedCityMissing' | 'errCitySave' | 'errLocationNeeded'
+  | 'errTableLoad' | 'errNoCityCompared' | 'errLocationRead' | 'errOutsideSweden'
+  | 'errCannotConfirmSweden';
+
+class TableHttpError extends Error {
+  constructor(readonly status: number) {
+    super(`HTTP ${status}`);
+  }
+}
 
 type CachedPrayerDataset = { calendarYear: number; dataset: PrayerDataset };
 type LocationMode = 'automatic' | 'manual';
@@ -48,9 +60,11 @@ type PrayerContextValue = {
   today?: PrayerDay;
   tomorrow?: PrayerDay;
   month: PrayerDay[];
+  getDay: (date: Date) => PrayerDay | undefined;
   loading: boolean;
   locating: boolean;
   error: string | null;
+  locationErrorKey: LocationErrorKey | null;
   permission: Location.LocationPermissionResponse | null;
   locate: () => Promise<void>;
   selectCity: (city: string) => void;
@@ -69,7 +83,8 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
   const [nearestDistanceKm, setNearestDistanceKm] = useState<number | null>(null);
   const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
   const [locating, setLocating] = useState(false);
-  const [locationError, setLocationError] = useState<string | null>(null);
+  const { t } = useLanguage();
+  const [locationErrorKey, setLocationError] = useState<LocationErrorKey | null>(null);
   const locatingRef = useRef(false);
   const autoLocateStartedRef = useRef(false);
   const hasLocationAccessRef = useRef(false);
@@ -107,7 +122,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch {
-        if (active) setLocationError('Den sparade staden kunde inte läsas. Hitta din plats eller välj stad igen.');
+        if (active) setLocationError('errSavedCityRead');
       } finally {
         if (active) setTableCacheReady(true);
       }
@@ -123,7 +138,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
         : PRAYER_DATA_URL;
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`Bönetidstabellen kunde inte laddas (HTTP ${response.status}).`);
+        throw new TableHttpError(response.status);
       }
       const dataset = normalizePrayerDataset(await response.json());
       void AsyncStorage.setItem(PRAYER_CACHE_KEY, JSON.stringify({
@@ -144,7 +159,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       city,
       mode: locationMode,
     } satisfies CachedLocation)).catch(() => {
-      setLocationError('Den valda staden kunde inte sparas på telefonen.');
+      setLocationError('errCitySave');
     });
   }, [tableCacheReady, city, locationMode]);
 
@@ -154,7 +169,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       setCity(null);
       setLocationMode('automatic');
       setNearestDistanceKm(null);
-      setLocationError('Den sparade staden finns inte längre i tabellen. Hitta din plats eller välj stad igen.');
+      setLocationError('errSavedCityMissing');
     }
   }, [query.data, city]);
 
@@ -167,7 +182,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
     try {
       const result = permission?.granted ? permission : await requestPermission();
       if (!result.granted) {
-        setLocationError('Platsåtkomst behövs för att välja rätt svensk stad.');
+        setLocationError('errLocationNeeded');
         return;
       }
       hasLocationAccessRef.current = true;
@@ -204,14 +219,12 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
         if (manualSelectionRef.current === selectionAtStart) {
           setNearestDistanceKm(null);
         }
-        setLocationError(countryCode
-          ? 'Din plats är utanför Sverige. Islamiska förbundets tabell gäller bara svenska städer.'
-          : 'Vi kunde inte bekräfta att din plats är i Sverige. Försök igen eller välj stad.');
+        setLocationError(countryCode ? 'errOutsideSweden' : 'errCannotConfirmSweden');
         return;
       }
       const dataset = query.data ?? (await query.refetch()).data;
       if (!dataset) {
-        setLocationError('Bönetidstabellen kunde inte laddas. Kontrollera internetanslutningen och försök igen.');
+        setLocationError('errTableLoad');
         return;
       }
       const nearest = nearestSupportedCity(dataset.cities, coords);
@@ -221,10 +234,10 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
           setNearestDistanceKm(nearest.distanceKm);
         }
       } else {
-        setLocationError('Ingen av tabellens städer kunde jämföras med din plats. Välj stad manuellt.');
+        setLocationError('errNoCityCompared');
       }
     } catch {
-      setLocationError('Det gick inte att läsa eller kontrollera din plats. Försök igen eller välj stad.');
+      setLocationError('errLocationRead');
     } finally {
       locatingRef.current = false;
       setLocating(false);
@@ -274,12 +287,16 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
   }, [permission?.granted, locationMode]);
 
   const month = city ? query.data?.tables[city]?.[String(date.getMonth() + 1)] ?? [] : [];
+  const getDay = (target: Date) => (city
+    ? query.data?.tables[city]?.[String(target.getMonth() + 1)]?.find((day) => day.day === target.getDate())
+    : undefined);
   const today = month.find((day) => day.day === date.getDate());
   const nextDate = new Date(date);
   nextDate.setDate(date.getDate() + 1);
-  const tomorrow = city
-    ? query.data?.tables[city]?.[String(nextDate.getMonth() + 1)]?.find((day) => day.day === nextDate.getDate())
-    : undefined;
+  const tomorrow = getDay(nextDate);
+  const queryErrorMessage = query.error instanceof TableHttpError
+    ? t.errTableHttp(query.error.status)
+    : query.error instanceof Error ? query.error.message : null;
   const value = useMemo<PrayerContextValue>(
     () => ({
       dataset: query.data,
@@ -289,9 +306,11 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       today,
       tomorrow,
       month,
+      getDay,
       loading: !tableCacheReady || query.isLoading,
       locating,
-      error: locationError ?? (query.error instanceof Error ? query.error.message : null),
+      error: (locationErrorKey ? t[locationErrorKey] : null) ?? queryErrorMessage,
+      locationErrorKey,
       permission,
       locate,
       selectCity: (selectedCity) => {
@@ -306,7 +325,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       },
       refresh: query.refetch,
     }),
-    [query.data, tableCacheReady, query.isLoading, query.error, query.refetch, city, nearestDistanceKm, coordinates, today, tomorrow, month, locating, locationError, permission],
+    [query.data, tableCacheReady, query.isLoading, queryErrorMessage, query.refetch, city, nearestDistanceKm, coordinates, today, tomorrow, month, locating, locationErrorKey, t, permission],
   );
   return <PrayerContext.Provider value={value}>{children}</PrayerContext.Provider>;
 }

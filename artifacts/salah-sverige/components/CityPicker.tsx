@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useLanguage } from '@/context/LanguageContext';
 import { usePrayer } from '@/context/PrayerContext';
 import { useColors } from '@/hooks/useColors';
 import { normalizePlace } from '@/lib/prayer';
 
 export function CityPicker({ compact = false }: { compact?: boolean }) {
   const colors = useColors();
+  const { t } = useLanguage();
   const { city, dataset, selectCity, locate, locating } = usePrayer();
   const [visible, setVisible] = useState(false);
   const [query, setQuery] = useState('');
@@ -21,7 +23,7 @@ export function CityPicker({ compact = false }: { compact?: boolean }) {
       >
         <Feather name="map-pin" size={16} color={colors.primary} />
         <Text numberOfLines={1} style={[styles.triggerText, { color: colors.foreground }]}>
-          {city ?? (compact ? 'Välj stad' : 'Välj din närmaste stad')}
+          {city ?? (compact ? t.chooseCity : t.chooseNearestCity)}
         </Text>
         <Feather name="chevron-down" size={16} color={colors.mutedForeground} />
       </Pressable>
@@ -29,8 +31,8 @@ export function CityPicker({ compact = false }: { compact?: boolean }) {
         <View style={[styles.modal, { backgroundColor: colors.background }]}>
           <View style={styles.modalHeader}>
             <View>
-              <Text style={[styles.eyebrow, { color: colors.primary }]}>ISLAMISKA FÖRBUNDETS TABELL</Text>
-              <Text style={[styles.title, { color: colors.foreground }]}>Välj stad</Text>
+              <Text style={[styles.eyebrow, { color: colors.primary }]}>{t.tableEyebrow}</Text>
+              <Text style={[styles.title, { color: colors.foreground }]}>{t.chooseCity}</Text>
             </View>
             <Pressable onPress={() => setVisible(false)} hitSlop={12}>
               <Feather name="x" size={25} color={colors.foreground} />
@@ -41,7 +43,7 @@ export function CityPicker({ compact = false }: { compact?: boolean }) {
             <TextInput
               value={query}
               onChangeText={setQuery}
-              placeholder="Sök bland svenska städer"
+              placeholder={t.searchCities}
               placeholderTextColor={colors.mutedForeground}
               style={[styles.input, { color: colors.foreground }]}
             />
@@ -56,7 +58,7 @@ export function CityPicker({ compact = false }: { compact?: boolean }) {
           >
             <Feather name="navigation" size={19} color={colors.primary} />
             <Text style={[styles.locationText, { color: colors.secondaryForeground }]}>
-              {locating ? 'Hämtar din plats…' : 'Använd min plats'}
+              {locating ? t.locatingYou : t.useMyLocation}
             </Text>
           </Pressable>
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>

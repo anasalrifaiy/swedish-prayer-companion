@@ -135,11 +135,34 @@ export function getPrayerState(day: PrayerDay | undefined, now = new Date(), tom
   };
 }
 
+const KAABA = { latitude: 21.422487, longitude: 39.826206 };
+
 export function qiblaBearing(latitude: number, longitude: number) {
-  const kaabaLat = (21.4225 * Math.PI) / 180;
-  const deltaLon = ((39.8262 - longitude) * Math.PI) / 180;
+  const kaabaLat = (KAABA.latitude * Math.PI) / 180;
+  const deltaLon = ((KAABA.longitude - longitude) * Math.PI) / 180;
   const userLat = (latitude * Math.PI) / 180;
   const y = Math.sin(deltaLon);
   const x = Math.cos(userLat) * Math.tan(kaabaLat) - Math.sin(userLat) * Math.cos(deltaLon);
   return (((Math.atan2(y, x) * 180) / Math.PI) + 360) % 360;
+}
+
+export function qiblaDistanceKm(latitude: number, longitude: number) {
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  const latDiff = radians(KAABA.latitude - latitude);
+  const lonDiff = radians(KAABA.longitude - longitude);
+  const a = Math.sin(latDiff / 2) ** 2
+    + Math.cos(radians(latitude)) * Math.cos(radians(KAABA.latitude)) * Math.sin(lonDiff / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
+}
+
+/** Signed smallest difference from `from` to `to`, in the range (-180, 180]. */
+export function angleDelta(from: number, to: number) {
+  const diff = ((to - from + 540) % 360) - 180;
+  return diff === -180 ? 180 : diff;
+}
+
+/** Low-pass filter for compass headings that handles the 359°→0° wrap. */
+export function smoothHeading(previous: number | null, next: number, alpha = 0.25) {
+  if (previous === null) return ((next % 360) + 360) % 360;
+  return (((previous + alpha * angleDelta(previous, next)) % 360) + 360) % 360;
 }

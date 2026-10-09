@@ -5,36 +5,53 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { AppBackground } from '@/components/AppBackground';
 import { CityPicker } from '@/components/CityPicker';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { useLanguage } from '@/context/LanguageContext';
 import { usePrayer } from '@/context/PrayerContext';
 import { useReminders } from '@/context/ReminderContext';
-import { getPrayerState, prayers, swedishPrayerNames } from '@/lib/prayer';
+import { getPrayerState, prayers } from '@/lib/prayer';
 import type { ReminderPrayer } from '@/lib/prayer-reminders';
 import { useColors } from '@/hooks/useColors';
 
 const PRIVACY_POLICY_URL = 'https://github.com/anasalrifaiy/swedish-prayer-companion/blob/main/PRIVACY_POLICY.md';
 
-function formatDuration(seconds: number) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  return h > 0 ? `${h} tim ${m} min` : `${m} min`;
-}
+const pad = (value: number) => String(value).padStart(2, '0');
 
 export default function TodayScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { city, nearestDistanceKm, today, tomorrow, loading, locating, error, permission, locate, openSettings, refresh } = usePrayer();
+  const { t, locale, isRTL } = useLanguage();
+  const { city, nearestDistanceKm, today, tomorrow, getDay, loading, locating, error, permission, locate, openSettings, refresh } = usePrayer();
   const {
     preferences: reminders, loading: remindersLoading, saving: remindersSaving,
     error: reminderError, permissionGranted: reminderPermission, updatePreferences, openSettings: openNotificationSettings,
   } = useReminders();
   const [now, setNow] = useState(new Date());
+  const [dayOffset, setDayOffset] = useState(0);
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
   const state = getPrayerState(today, now, tomorrow);
-  const date = new Intl.DateTimeFormat('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' }).format(now);
+  const shiftDate = (days: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
+  const selectedDate = shiftDate(dayOffset);
+  const selectedDay = dayOffset === 0 ? today : getDay(selectedDate);
+  const isToday = dayOffset === 0;
+  // The timetable only covers the current calendar year.
+  const canNavigate = (days: number) => {
+    const target = shiftDate(days);
+    return target.getFullYear() === now.getFullYear() && !!getDay(target);
+  };
+  const canGoPrevious = canNavigate(dayOffset - 1);
+  const canGoNext = canNavigate(dayOffset + 1);
+  const date = new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long', year: isToday ? undefined : 'numeric' }).format(selectedDate);
+  const clock = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
   const webTop = Platform.OS === 'web' ? 67 : 0;
+  const modeLabel = (mode: string) => (mode === 'off' ? t.modeOff : mode === 'vibration' ? t.modeVibration : t.modeSound);
+  const changeDay = (days: number) => {
+    void Haptics.selectionAsync().catch(() => undefined);
+    setDayOffset((value) => value + days);
+  };
   const cycleReminderMode = (name: ReminderPrayer) => {
     const current = reminders.prayers[name];
     const next = current === 'off' ? 'vibration' : current === 'vibration' ? 'sound' : 'off';
@@ -43,6 +60,7 @@ export default function TodayScreen() {
       prayers: { ...reminders.prayers, [name]: next },
     });
   };
+  const durationText = (seconds: number) => t.inDuration(Math.floor(seconds / 3600), Math.floor((seconds % 3600) / 60));
 
   return (
     <AppBackground>
@@ -53,17 +71,43 @@ export default function TodayScreen() {
       >
         <View style={styles.topbar}>
           <View>
-            <Text style={[styles.brand, { color: colors.softGold }]}>PRAYER SVERIGE</Text>
-            <Text style={[styles.date, { color: colors.heroForeground }]}>{date}</Text>
+            <Text style={[styles.brand, { color: colors.softGold }]}>{t.brand}</Text>
+            <Text style={[styles.clock, { color: colors.heroForeground }]}>{clock}</Text>
           </View>
-          <View style={[styles.star, { borderColor: colors.softGold }]}>
-            <MaterialCommunityIcons name="star-four-points-outline" size={21} color={colors.softGold} />
-          </View>
+          <LanguageSwitcher />
+        </View>
+        <View style={styles.dateNav}>
+          <Pressable
+            testID="previous-day"
+            accessibilityRole="button"
+            accessibilityLabel={t.previousDay}
+            disabled={!canGoPrevious}
+            onPress={() => changeDay(-1)}
+            hitSlop={8}
+            style={[styles.navButton, { borderColor: colors.softGold }, !canGoPrevious && styles.navDisabled]}
+          >
+            <Feather name={isRTL ? 'chevron-right' : 'chevron-left'} size={20} color={colors.softGold} />
+          </Pressable>
+          <Pressable disabled={isToday} onPress={() => setDayOffset(0)} style={styles.dateButton} accessibilityRole="button" accessibilityLabel={t.backToToday}>
+            <Text style={[styles.date, { color: colors.heroForeground }]} numberOfLines={2}>{date}</Text>
+            {!isToday && <Text style={[styles.backToToday, { color: colors.softGold }]}>{t.backToToday}</Text>}
+          </Pressable>
+          <Pressable
+            testID="next-day"
+            accessibilityRole="button"
+            accessibilityLabel={t.nextDay}
+            disabled={!canGoNext}
+            onPress={() => changeDay(1)}
+            hitSlop={8}
+            style={[styles.navButton, { borderColor: colors.softGold }, !canGoNext && styles.navDisabled]}
+          >
+            <Feather name={isRTL ? 'chevron-left' : 'chevron-right'} size={20} color={colors.softGold} />
+          </Pressable>
         </View>
         <View style={styles.cityWrap}><CityPicker compact /></View>
         {city && nearestDistanceKm !== null && (
           <Text style={[styles.nearestNotice, { color: colors.heroForeground }]}>
-            Närmaste tabellstad: {city} · {Math.round(nearestDistanceKm)} km från dig. Tiderna gäller {city}, inte exakt din plats.
+            {t.nearestNotice(city, Math.round(nearestDistanceKm))}
           </Text>
         )}
         {!!city && !!error && <Text style={[styles.locationWarning, { color: colors.softGold }]}>{error}</Text>}
@@ -73,9 +117,9 @@ export default function TodayScreen() {
             <View style={[styles.permissionIcon, { backgroundColor: colors.secondary }]}>
               <Feather name="navigation" size={25} color={colors.primary} />
             </View>
-            <Text style={[styles.permissionTitle, { color: colors.foreground }]}>Bönetider där du är</Text>
+            <Text style={[styles.permissionTitle, { color: colors.foreground }]}>{t.prayerTimesWhereYouAre}</Text>
             <Text style={[styles.permissionBody, { color: colors.mutedForeground }]}>
-              Vi använder din plats för att välja närmaste stad i Islamiska förbundets svenska tabell. Tiderna gäller den staden, inte exakt din plats.
+              {t.locationExplainer}
             </Text>
             {!!error && <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text>}
             <Pressable
@@ -84,59 +128,60 @@ export default function TodayScreen() {
               style={({ pressed }) => [styles.primaryButton, { backgroundColor: colors.primary }, pressed && styles.pressed]}
             >
               {locating || loading ? <ActivityIndicator color={colors.primaryForeground} /> : <Feather name="crosshair" size={19} color={colors.primaryForeground} />}
-              <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Hitta min plats</Text>
+              <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{t.findMyLocation}</Text>
             </Pressable>
             {permission?.status === 'denied' && permission.canAskAgain === false && (
-              <Pressable onPress={openSettings}><Text style={[styles.settings, { color: colors.primary }]}>Öppna inställningar</Text></Pressable>
+              <Pressable onPress={openSettings}><Text style={[styles.settings, { color: colors.primary }]}>{t.openSettings}</Text></Pressable>
             )}
           </View>
         ) : (
           <>
-            <View style={styles.heroCopy}>
-              <View style={[styles.heroCityBadge, { borderColor: colors.softGold }]}>
-                <Feather name="map-pin" size={15} color={colors.softGold} />
-                <Text style={[styles.heroCity, { color: colors.heroForeground }]} numberOfLines={2}>
-                  Tabelltider för {city}
+            {isToday && (
+              <View style={styles.heroCopy}>
+                <View style={[styles.heroCityBadge, { borderColor: colors.softGold }]}>
+                  <Feather name="map-pin" size={15} color={colors.softGold} />
+                  <Text style={[styles.heroCity, { color: colors.heroForeground }]} numberOfLines={2}>
+                    {t.tableTimesFor(city)}
+                  </Text>
+                </View>
+                <Text style={[styles.kicker, { color: colors.softGold }]}>{t.nextPrayer}</Text>
+                <Text style={[styles.nextPrayer, { color: colors.heroForeground }]}>
+                   {state.next ? t.prayerNames[state.next.name] : t.noTime}
                 </Text>
-              </View>
-              <Text style={[styles.kicker, { color: colors.softGold }]}>NÄSTA BÖN</Text>
-              <Text style={[styles.nextPrayer, { color: colors.heroForeground }]}>
-                 {state.next ? swedishPrayerNames[state.next.name] : 'Ingen tid'}
-              </Text>
-              <Text style={[styles.nextTime, { color: colors.heroForeground }]}>
-                 {state.next ? `${String(state.next.time.getHours()).padStart(2, '0')}:${String(state.next.time.getMinutes()).padStart(2, '0')}` : '--:--'}
-              </Text>
-              <View style={[styles.countdown, { backgroundColor: colors.softGold }]}>
-                <Feather name="clock" size={15} color={colors.accentForeground} />
-                <Text style={[styles.countdownText, { color: colors.accentForeground }]}>
-                   {state.next ? `om ${formatDuration(state.secondsLeft)}` : 'Tabell saknas'}
+                <Text style={[styles.nextTime, { color: colors.heroForeground }]}>
+                   {state.next ? `${pad(state.next.time.getHours())}:${pad(state.next.time.getMinutes())}` : '--:--'}
                 </Text>
+                <View style={[styles.countdown, { backgroundColor: colors.softGold }]}>
+                  <Feather name="clock" size={15} color={colors.accentForeground} />
+                  <Text style={[styles.countdownText, { color: colors.accentForeground }]}>
+                     {state.next ? durationText(state.secondsLeft) : t.tableMissing}
+                  </Text>
+                </View>
               </View>
-            </View>
-            <View style={[styles.scheduleCard, { backgroundColor: colors.card }]}>
+            )}
+            <View style={[styles.scheduleCard, { backgroundColor: colors.card }, !isToday && styles.scheduleCardOtherDay]}>
               <View style={styles.scheduleHeader}>
                 <View>
-                  <Text style={[styles.scheduleTitle, { color: colors.foreground }]}>Dagens tider</Text>
+                  <Text style={[styles.scheduleTitle, { color: colors.foreground }]}>{isToday ? t.todaysTimes : t.dayTimes}</Text>
                   <Text style={[styles.scheduleSubtitle, { color: colors.mutedForeground }]}>{city}</Text>
                 </View>
                 <View style={[styles.officialBadge, { backgroundColor: colors.secondary }]}>
                   <Feather name="check-circle" size={13} color={colors.primary} />
-                  <Text style={[styles.officialText, { color: colors.secondaryForeground }]}>Officiell tabell</Text>
+                  <Text style={[styles.officialText, { color: colors.secondaryForeground }]}>{t.officialTable}</Text>
                 </View>
               </View>
               <Text style={[styles.reminderHint, { color: colors.mutedForeground }]}>
-                {Platform.OS === 'web'
-                  ? 'Böneaviseringar kan slås på i mobilappen.'
-                  : 'Tryck på ikonen för att växla mellan av, vibration och ljud.'}
+                {Platform.OS === 'web' ? t.reminderHintWeb : t.reminderHint}
               </Text>
               {!!reminderError && <Text style={[styles.reminderError, { color: colors.destructive }]}>{reminderError}</Text>}
               {reminderPermission === false && Platform.OS !== 'web' && !!reminderError && (
                 <Pressable onPress={openNotificationSettings} accessibilityRole="button">
-                  <Text style={[styles.reminderSettings, { color: colors.primary }]}>Öppna aviseringsinställningar</Text>
+                  <Text style={[styles.reminderSettings, { color: colors.primary }]}>{t.openNotificationSettings}</Text>
                 </Pressable>
               )}
+              {!selectedDay && !loading && <Text style={[styles.reminderError, { color: colors.mutedForeground }]}>{t.noDataForDay}</Text>}
               {prayers.map((name, index) => {
-                 const active = state.next?.name === name && state.next.time.getDate() === now.getDate();
+                 const active = isToday && state.next?.name === name && state.next.time.getDate() === now.getDate();
                   const reminderMode = name === 'Shuruk' ? 'off' : reminders.prayers[name];
                   const reminderOn = reminderMode !== 'off';
                 return (
@@ -144,14 +189,16 @@ export default function TodayScreen() {
                     <View style={[styles.prayerIcon, { backgroundColor: active ? colors.primary : colors.muted }]}>
                       <Feather name={name === 'Fajr' || name === 'Isha' ? 'moon' : name === 'Shuruk' ? 'sunrise' : name === 'Maghrib' ? 'sunset' : 'sun'} size={17} color={active ? colors.primaryForeground : colors.primary} />
                     </View>
-                    <Text style={[styles.prayerName, { color: active ? colors.primary : colors.foreground }]}>{swedishPrayerNames[name]}</Text>
-                    <Text style={[styles.prayerTime, { color: colors.foreground }]}>{today?.[name] ?? '--:--'}</Text>
-                    {name !== 'Shuruk' && (
+                    <Text style={[styles.prayerName, { color: active ? colors.primary : colors.foreground }]}>{t.prayerNames[name]}</Text>
+                    <Text style={[styles.prayerTime, { color: colors.foreground }]}>{selectedDay?.[name] ?? '--:--'}</Text>
+                    {name === 'Shuruk' ? (
+                      <View style={styles.reminderSpacer} />
+                    ) : (
                       <Pressable
                         testID={`today-reminder-${name}`}
                         accessibilityRole="button"
-                        accessibilityLabel={`Påminnelse för ${swedishPrayerNames[name]}: ${reminderMode === 'off' ? 'av' : reminderMode === 'vibration' ? 'vibration' : 'ljud'}`}
-                        accessibilityHint="Tryck för att växla mellan av, vibration och ljud."
+                        accessibilityLabel={t.reminderLabel(t.prayerNames[name], modeLabel(reminderMode))}
+                        accessibilityHint={t.reminderHintA11y}
                         accessibilityState={{ disabled: remindersLoading || remindersSaving || Platform.OS === 'web' }}
                         disabled={remindersLoading || remindersSaving || Platform.OS === 'web'}
                         onPress={() => cycleReminderMode(name)}
@@ -171,16 +218,16 @@ export default function TodayScreen() {
                 );
               })}
             </View>
-            <Text style={[styles.source, { color: colors.mutedForeground }]}>Källa: Islamiska förbundet i Sverige</Text>
+            <Text style={[styles.source, { color: colors.mutedForeground }]}>{t.source}</Text>
             {nearestDistanceKm !== null && (
-              <Text style={[styles.coordinateSource, { color: colors.mutedForeground }]}>Stadspositioner: GeoNames.org (CC BY 4.0)</Text>
+              <Text style={[styles.coordinateSource, { color: colors.mutedForeground }]}>{t.coordinateSource}</Text>
             )}
             <Pressable
               accessibilityRole="link"
               onPress={() => { void Linking.openURL(PRIVACY_POLICY_URL); }}
               style={styles.privacyLink}
             >
-              <Text style={[styles.coordinateSource, { color: colors.primary }]}>Integritetspolicy</Text>
+              <Text style={[styles.coordinateSource, { color: colors.primary }]}>{t.privacy}</Text>
             </Pressable>
           </>
         )}
@@ -193,9 +240,16 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 18, paddingBottom: 112, minHeight: '100%' },
   topbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   brand: { fontFamily: 'Inter_700Bold', fontSize: 11, letterSpacing: 2.1 },
-  date: { fontFamily: 'Inter_600SemiBold', fontSize: 15, marginTop: 5, textTransform: 'capitalize' },
-  star: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  cityWrap: { marginTop: 18, alignItems: 'flex-start' },
+  date: { fontFamily: 'Inter_600SemiBold', fontSize: 15, textAlign: 'center', textTransform: 'capitalize' },
+  clock: { fontFamily: 'Inter_700Bold', fontSize: 26, marginTop: 4, fontVariant: ['tabular-nums'] },
+  dateNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 14 },
+  navButton: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  navDisabled: { opacity: 0.3 },
+  dateButton: { flex: 1, alignItems: 'center' },
+  backToToday: { fontFamily: 'Inter_700Bold', fontSize: 11, marginTop: 3, letterSpacing: 1 },
+  scheduleCardOtherDay: { marginTop: 18 },
+  reminderSpacer: { width: 40, height: 40, marginLeft: 10 },
+  cityWrap: { marginTop: 14, alignItems: 'flex-start' },
   nearestNotice: { fontFamily: 'Inter_600SemiBold', fontSize: 13, lineHeight: 19, marginTop: 13 },
   locationWarning: { fontFamily: 'Inter_500Medium', fontSize: 12, lineHeight: 18, marginTop: 10 },
   heroCopy: { alignItems: 'center', paddingTop: 18, paddingBottom: 20 },

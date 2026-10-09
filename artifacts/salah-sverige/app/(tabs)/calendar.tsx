@@ -3,6 +3,8 @@ import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppBackground } from '@/components/AppBackground';
 import { CityPicker } from '@/components/CityPicker';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { useLanguage } from '@/context/LanguageContext';
 import { usePrayer } from '@/context/PrayerContext';
 import { useColors } from '@/hooks/useColors';
 
@@ -10,29 +12,33 @@ export default function CalendarScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { city, nearestDistanceKm, month } = usePrayer();
+  const { t, locale } = useLanguage();
   const now = new Date();
-  const monthName = new Intl.DateTimeFormat('sv-SE', { month: 'long', year: 'numeric' }).format(now);
+  const monthName = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(now);
   return (
     <AppBackground>
       <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'web' ? 67 : 0) + 14 }]}>
-        <Text style={[styles.kicker, { color: colors.softGold }]}>MÅNADSÖVERSIKT</Text>
+        <View style={styles.kickerRow}>
+          <Text style={[styles.kicker, { color: colors.softGold }]}>{t.monthOverview}</Text>
+          <LanguageSwitcher />
+        </View>
         <Text style={[styles.title, { color: colors.heroForeground }]}>{monthName}</Text>
         <View style={styles.picker}><CityPicker compact /></View>
         {city && nearestDistanceKm !== null && (
           <Text style={[styles.nearestNotice, { color: colors.heroForeground }]}>
-            Närmaste tabellstad: {city} · {Math.round(nearestDistanceKm)} km bort. Tiderna gäller {city}.
+            {t.nearestNoticeShort(city, Math.round(nearestDistanceKm))}
           </Text>
         )}
       </View>
       <View style={[styles.sheet, { backgroundColor: colors.background }]}>
         <View style={[styles.tableHeader, { borderBottomColor: colors.border }]}>
-          {['Dag', 'Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'].map((item) => (
-            <Text key={item} style={[styles.th, item === 'Dag' && styles.dayCell, { color: colors.mutedForeground }]}>{item}</Text>
+          {[t.day, t.prayerNames.Fajr, t.prayerNames.Dhuhr, t.prayerNames.Asr, t.prayerNames.Maghrib, t.prayerNames.Isha].map((item, index) => (
+            <Text key={index} style={[styles.th, index === 0 && styles.dayCell, { color: colors.mutedForeground }]}>{item}</Text>
           ))}
         </View>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
           {!city ? (
-            <Text style={[styles.empty, { color: colors.mutedForeground }]}>Välj en stad för att se månadens bönetider.</Text>
+            <Text style={[styles.empty, { color: colors.mutedForeground }]}>{t.chooseCityForMonth}</Text>
           ) : month.map((day) => {
             const active = day.day === now.getDate();
             return (
@@ -46,7 +52,7 @@ export default function CalendarScreen() {
           })}
           {!!city && (
             <Text style={[styles.source, { color: colors.mutedForeground }]}>
-              Källa: Islamiska förbundet i Sverige{nearestDistanceKm !== null ? '\nStadspositioner: GeoNames.org (CC BY 4.0)' : ''}
+              {nearestDistanceKm !== null ? t.sourceWithCoords : t.source}
             </Text>
           )}
         </ScrollView>
@@ -57,6 +63,7 @@ export default function CalendarScreen() {
 
 const styles = StyleSheet.create({
   header: { paddingHorizontal: 18, paddingBottom: 22 },
+  kickerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   kicker: { fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 1.8 },
   title: { fontFamily: 'Inter_700Bold', fontSize: 31, textTransform: 'capitalize', marginTop: 5 },
   picker: { marginTop: 14, alignItems: 'flex-start' },

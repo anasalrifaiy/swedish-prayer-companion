@@ -3,10 +3,12 @@ import { Platform, StyleSheet, useColorScheme, View } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { Tabs } from 'expo-router';
+import { useLanguage } from '@/context/LanguageContext';
 import { useColors } from '@/hooks/useColors';
 
 export default function TabLayout() {
   const colors = useColors();
+  const { t } = useLanguage();
   const dark = useColorScheme() === 'dark';
   return (
     <Tabs
@@ -32,9 +34,9 @@ export default function TabLayout() {
           ),
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Idag', tabBarIcon: ({ color }) => <Feather name="sun" size={22} color={color} /> }} />
-      <Tabs.Screen name="calendar" options={{ title: 'Månad', tabBarIcon: ({ color }) => <Feather name="calendar" size={21} color={color} /> }} />
-      <Tabs.Screen name="qibla" options={{ title: 'Qibla', tabBarIcon: ({ color }) => <MaterialCommunityIcons name="compass-outline" size={24} color={color} /> }} />
+      <Tabs.Screen name="index" options={{ title: t.tabToday, tabBarIcon: ({ color }) => <Feather name="sun" size={22} color={color} /> }} />
+      <Tabs.Screen name="calendar" options={{ title: t.tabMonth, tabBarIcon: ({ color }) => <Feather name="calendar" size={21} color={color} /> }} />
+      <Tabs.Screen name="qibla" options={{ title: t.tabQibla, tabBarIcon: ({ color }) => <MaterialCommunityIcons name="compass-outline" size={24} color={color} /> }} />
     </Tabs>
   );
 }

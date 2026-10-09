@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { apiBaseUrl } from '@/lib/api-config';
+import { LanguageProvider } from '@/context/LanguageContext';
 import { PrayerProvider } from '@/context/PrayerContext';
 import { ReminderProvider } from '@/context/ReminderContext';
 import {
@@ -36,15 +37,17 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <PrayerProvider>
-            <ReminderProvider>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <Stack screenOptions={{ headerShown: false }}>
-                  <Stack.Screen name="(tabs)" />
-                </Stack>
-              </GestureHandlerRootView>
-            </ReminderProvider>
-          </PrayerProvider>
+          <LanguageProvider>
+            <PrayerProvider>
+              <ReminderProvider>
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                  <Stack screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="(tabs)" />
+                  </Stack>
+                </GestureHandlerRootView>
+              </ReminderProvider>
+            </PrayerProvider>
+          </LanguageProvider>
         </QueryClientProvider>
       </ErrorBoundary>
     </SafeAreaProvider>

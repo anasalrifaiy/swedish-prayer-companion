@@ -10,6 +10,8 @@ import { cancelScheduledNotificationAsync } from 'expo-notifications/build/cance
 import { scheduleNotificationAsync } from 'expo-notifications/build/scheduleNotificationAsync';
 import { setNotificationChannelAsync } from 'expo-notifications/build/setNotificationChannelAsync';
 import { usePrayer } from './PrayerContext';
+import { useLanguage } from './LanguageContext';
+import type { Strings } from '@/lib/i18n';
 import {
   defaultReminderPreferences,
   readReminderPreferences,
@@ -24,6 +26,10 @@ const OWNER = 'prayer-sverige';
 const VIBRATION_CHANNEL = 'prayer-vibration-v1';
 const SOUND_CHANNEL = 'prayer-sound-v1';
 const LOOKAHEAD_DAYS = Platform.OS === 'ios' ? 12 : 45;
+
+type ReminderErrorKey =
+  | 'errRemindersRead' | 'errAllowNotifications' | 'errChooseCityForReminders'
+  | 'errSwedishTimezone' | 'errRemindersUpdate' | 'errSettingSave' | 'errOpenSettings';
 
 type ReminderContextValue = {
   preferences: ReminderPreferences;
@@ -66,17 +72,17 @@ function notificationModule() {
   return LocalNotifications;
 }
 
-async function ensureChannels(notificationApi: typeof LocalNotifications) {
+async function ensureChannels(notificationApi: typeof LocalNotifications, t: Strings) {
   if (Platform.OS !== 'android') return;
   await notificationApi.setNotificationChannelAsync(VIBRATION_CHANNEL, {
-    name: 'Bönetider · vibration',
+    name: t.channelVibration,
     importance: notificationApi.AndroidImportance.HIGH,
     sound: null,
     enableVibrate: true,
     vibrationPattern: [0, 450, 200, 450],
   });
   await notificationApi.setNotificationChannelAsync(SOUND_CHANNEL, {
-    name: 'Bönetider · ljud',
+    name: t.channelSound,
     importance: notificationApi.AndroidImportance.HIGH,
     sound: 'default',
     enableVibrate: false,
@@ -94,15 +100,16 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
   const {
     city,
     dataset,
-    error: locationError,
+    locationErrorKey,
     loading: prayerLoading,
     locating,
   } = usePrayer();
+  const { t, language } = useLanguage();
   const [preferences, setPreferences] = useState(defaultReminderPreferences);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ReminderErrorKey | null>(null);
   const [scheduledCount, setScheduledCount] = useState<number | null>(null);
   const [scheduledUntil, setScheduledUntil] = useState<Date | null>(null);
   const [refresh, setRefresh] = useState(0);
@@ -121,7 +128,7 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
           if (active) setPermissionGranted(status.granted);
         }
       } catch {
-        if (active) setError('Påminnelser kunde inte läsas från telefonen.');
+        if (active) setError('errRemindersRead');
       } finally {
         if (active) setLoading(false);
       }
@@ -141,7 +148,7 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading || prayerLoading || (locating && !city) || Platform.OS === 'web') return;
-    const snapshot = { preferences, city, dataset, locationError };
+    const snapshot = { preferences, city, dataset, locationErrorKey, t };
     queue.current = queue.current.catch(() => undefined).then(async () => {
       let schedulingStarted = false;
       try {
@@ -163,19 +170,19 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
           await cancelOurReminders(Notifications);
           setScheduledCount(0);
           setScheduledUntil(null);
-          setError('Tillåt aviseringar i telefonens inställningar för att få påminnelser.');
+          setError('errAllowNotifications');
           return;
         }
         if (!snapshot.city || !snapshot.dataset) {
-          if (!snapshot.city && snapshot.locationError?.includes('utanför Sverige')) {
+          if (!snapshot.city && snapshot.locationErrorKey === 'errOutsideSweden') {
             await cancelOurReminders(Notifications);
             setScheduledCount(0);
             setScheduledUntil(null);
           }
-          setError('Välj en tabellstad för att schemalägga påminnelser.');
+          setError('errChooseCityForReminders');
           return;
         }
-        await ensureChannels(Notifications);
+        await ensureChannels(Notifications, snapshot.t);
         // Local date triggers use the phone's time zone. Abroad, deliver in Swedish time via push only.
         const inSwedenTime = Intl.DateTimeFormat().resolvedOptions().timeZone === 'Europe/Stockholm';
         const reminders = inSwedenTime ? upcomingPrayerReminders(
@@ -187,8 +194,8 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
           const mode = snapshot.preferences.prayers[prayer];
           await Notifications.scheduleNotificationAsync({
             content: {
-              title: `${prayer} · ${snapshot.city}`,
-              body: `Det är dags för ${prayer} enligt tabellen för ${snapshot.city}.`,
+              title: `${snapshot.t.prayerNames[prayer]} · ${snapshot.city}`,
+              body: snapshot.t.notificationBody(snapshot.t.prayerNames[prayer], snapshot.city),
               sound: mode === 'sound' ? 'default' : false,
               data: { owner: OWNER, city: snapshot.city, prayer },
             },
@@ -203,7 +210,7 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
         }
         setScheduledCount(reminders.length);
         setScheduledUntil(reminders.at(-1)?.date ?? null);
-        setError(inSwedenTime ? null : 'Lokala påminnelser fungerar bara i svensk tidszon.');
+        setError(inSwedenTime ? null : 'errSwedishTimezone');
       } catch (cause) {
         if (__DEV__) console.error(
           'Reminder update failed:',
@@ -214,10 +221,10 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
           setScheduledCount(null);
           setScheduledUntil(null);
         }
-        setError('Påminnelser kunde inte uppdateras. Kontrollera aviseringsbehörigheten och försök igen.');
+        setError('errRemindersUpdate');
       }
     });
-  }, [loading, prayerLoading, locating, preferences, city, dataset, locationError, refresh]);
+  }, [loading, prayerLoading, locating, preferences, city, dataset, locationErrorKey, language, refresh]);
 
   const updatePreferences = async (next: ReminderPreferences) => {
     if (saving || loading || Platform.OS === 'web') return;
@@ -227,12 +234,12 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
         && !Object.values(preferences.prayers).some((mode) => mode !== 'off');
       if (enabling) {
         const Notifications = await notificationModule();
-        await ensureChannels(Notifications);
+        await ensureChannels(Notifications, t);
         const current = await Notifications.getPermissionsAsync();
         const status = current.granted ? current : await Notifications.requestPermissionsAsync();
         setPermissionGranted(status.granted);
         if (!status.granted) {
-          setError('Tillåt aviseringar i telefonens inställningar för att få påminnelser.');
+          setError('errAllowNotifications');
           return;
         }
       }
@@ -240,7 +247,7 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
       setPreferences(next);
       setError(null);
     } catch {
-      setError('Inställningen kunde inte sparas. Försök igen.');
+      setError('errSettingSave');
     } finally {
       setSaving(false);
     }
@@ -248,12 +255,12 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ReminderContext.Provider value={{
-      preferences, loading, saving, permissionGranted, error, scheduledCount, scheduledUntil,
+      preferences, loading, saving, permissionGranted, error: error ? t[error] : null, scheduledCount, scheduledUntil,
       updatePreferences,
       openSettings: async () => {
         if (Platform.OS !== 'web') {
           try { await Linking.openSettings(); }
-          catch { setError('Det gick inte att öppna telefonens inställningar.'); }
+          catch { setError('errOpenSettings'); }
         }
       },
     }}>
