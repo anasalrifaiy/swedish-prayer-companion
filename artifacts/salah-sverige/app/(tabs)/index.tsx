@@ -46,6 +46,11 @@ export default function TodayScreen() {
   const canGoNext = canNavigate(dayOffset + 1);
   const date = new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long', year: isToday ? undefined : 'numeric' }).format(selectedDate);
   const clock = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  const openExactAlarmSettings = () => {
+    Linking.sendIntent('android.settings.REQUEST_SCHEDULE_EXACT_ALARM').catch(() => {
+      void Linking.openSettings();
+    });
+  };
   const webTop = Platform.OS === 'web' ? 67 : 0;
   const modeLabel = (mode: string) => (mode === 'off' ? t.modeOff : mode === 'vibration' ? t.modeVibration : t.modeSound);
   const changeDay = (days: number) => {
@@ -177,6 +182,11 @@ export default function TodayScreen() {
               {reminderPermission === false && Platform.OS !== 'web' && !!reminderError && (
                 <Pressable onPress={openNotificationSettings} accessibilityRole="button">
                   <Text style={[styles.reminderSettings, { color: colors.primary }]}>{t.openNotificationSettings}</Text>
+                </Pressable>
+              )}
+              {Platform.OS === 'android' && reminderPermission && (
+                <Pressable onPress={openExactAlarmSettings} accessibilityRole="button">
+                  <Text style={[styles.reminderSettings, { color: colors.primary }]}>{t.exactAlarmSettings}</Text>
                 </Pressable>
               )}
               {!selectedDay && !loading && <Text style={[styles.reminderError, { color: colors.mutedForeground }]}>{t.noDataForDay}</Text>}
