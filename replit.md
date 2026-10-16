@@ -32,6 +32,7 @@ _Populate as you build — non-obvious choices a reader couldn't infer from the 
 - Hämtar användarens plats och matchar den mot en stad i Islamiska förbundets svenska tabell.
 - Visar dagens och månadens bönetider med tydlig källangivelse.
 - Visar Qibla-riktning och använder enhetens kompass på fysisk telefon.
+- Schemalägger lokala påminnelser vid bönetid och valfritt 15 minuter före varje bön; Android använder alarmklockor för punktligare aviseringar.
 
 ## User preferences
 

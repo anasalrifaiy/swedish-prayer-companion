@@ -32,11 +32,13 @@ const sv = {
   dayTimes: 'Dagens bönetider',
   officialTable: 'Officiell tabell',
   reminderHintWeb: 'Böneaviseringar kan slås på i mobilappen.',
-  exactAlarmSettings: 'Aviseringar försenade? Tillåt exakta larm',
+  exactAlarmSettings: 'Tillåt exakta larm för punktliga aviseringar',
   reminderHint: 'Tryck på ikonen för att växla mellan av, vibration och ljud.',
   openNotificationSettings: 'Öppna aviseringsinställningar',
   reminderLabel: (prayer: string, mode: string) => `Påminnelse för ${prayer}: ${mode}`,
   reminderHintA11y: 'Tryck för att växla mellan av, vibration och ljud.',
+  beforePrayerLabel: '15 min före varje bön',
+  beforePrayerHint: 'Få en förvarning så att du hinner förbereda dig.',
   modeOff: 'av',
   modeVibration: 'vibration',
   modeSound: 'ljud',
@@ -103,6 +105,8 @@ const sv = {
   channelVibration: 'Bönetider · vibration',
   channelSound: 'Bönetider · ljud',
   notificationBody: (prayer: string, city: string) => `Det är dags för ${prayer} enligt tabellen för ${city}.`,
+  beforePrayerTitle: (prayer: string) => `Förbered dig för ${prayer}`,
+  beforePrayerBody: (prayer: string, city: string) => `${prayer} börjar om 15 minuter enligt tabellen för ${city}.`,
 };
 
 export type Strings = typeof sv;
@@ -129,11 +133,13 @@ const en: Strings = {
   dayTimes: 'Prayer times',
   officialTable: 'Official timetable',
   reminderHintWeb: 'Prayer notifications can be enabled in the mobile app.',
-  exactAlarmSettings: 'Notifications late? Allow exact alarms',
+  exactAlarmSettings: 'Allow exact alarms for on-time reminders',
   reminderHint: 'Tap the icon to switch between off, vibration and sound.',
   openNotificationSettings: 'Open notification settings',
   reminderLabel: (prayer, mode) => `Reminder for ${prayer}: ${mode}`,
   reminderHintA11y: 'Tap to switch between off, vibration and sound.',
+  beforePrayerLabel: '15 min before each prayer',
+  beforePrayerHint: 'Get a gentle heads-up so you can prepare.',
   modeOff: 'off',
   modeVibration: 'vibration',
   modeSound: 'sound',
@@ -200,6 +206,8 @@ const en: Strings = {
   channelVibration: 'Prayer times · vibration',
   channelSound: 'Prayer times · sound',
   notificationBody: (prayer, city) => `It's time for ${prayer} according to the timetable for ${city}.`,
+  beforePrayerTitle: (prayer) => `Get ready for ${prayer}`,
+  beforePrayerBody: (prayer, city) => `${prayer} begins in 15 minutes according to the timetable for ${city}.`,
 };
 
 const ar: Strings = {
@@ -224,11 +232,13 @@ const ar: Strings = {
   dayTimes: 'مواقيت الصلاة',
   officialTable: 'جدول رسمي',
   reminderHintWeb: 'يمكن تفعيل تنبيهات الصلاة في تطبيق الجوال.',
-  exactAlarmSettings: 'التنبيهات متأخرة؟ اسمح بالمنبهات الدقيقة',
+  exactAlarmSettings: 'اسمح بالمنبهات الدقيقة لتصلك التنبيهات في وقتها',
   reminderHint: 'اضغط على الأيقونة للتبديل بين إيقاف والاهتزاز والصوت.',
   openNotificationSettings: 'فتح إعدادات الإشعارات',
   reminderLabel: (prayer, mode) => `تنبيه ${prayer}: ${mode}`,
   reminderHintA11y: 'اضغط للتبديل بين إيقاف والاهتزاز والصوت.',
+  beforePrayerLabel: 'قبل كل صلاة بـ 15 دقيقة',
+  beforePrayerHint: 'تنبيه مبكر يمنحك وقتاً للاستعداد.',
   modeOff: 'إيقاف',
   modeVibration: 'اهتزاز',
   modeSound: 'صوت',
@@ -295,6 +305,8 @@ const ar: Strings = {
   channelVibration: 'مواقيت الصلاة · اهتزاز',
   channelSound: 'مواقيت الصلاة · صوت',
   notificationBody: (prayer, city) => `حان وقت ${prayer} حسب جدول ${city}.`,
+  beforePrayerTitle: (prayer) => `استعد لصلاة ${prayer}`,
+  beforePrayerBody: (prayer, city) => `تبقى 15 دقيقة على صلاة ${prayer} حسب جدول ${city}.`,
 };
 
 export const translations: Record<Language, Strings> = { sv, en, ar };

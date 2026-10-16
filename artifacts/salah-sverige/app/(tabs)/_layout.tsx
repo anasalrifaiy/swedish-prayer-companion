@@ -34,9 +34,9 @@ export default function TabLayout() {
           ),
       }}
     >
-      <Tabs.Screen name="index" options={{ title: t.tabToday, tabBarIcon: ({ color }) => <Feather name="sun" size={22} color={color} /> }} />
-      <Tabs.Screen name="calendar" options={{ title: t.tabMonth, tabBarIcon: ({ color }) => <Feather name="calendar" size={21} color={color} /> }} />
-      <Tabs.Screen name="qibla" options={{ title: t.tabQibla, tabBarIcon: ({ color }) => <MaterialCommunityIcons name="compass-outline" size={24} color={color} /> }} />
+      <Tabs.Screen name="index" options={{ title: t.tabToday, tabBarIcon: ({ color }) => <Feather name="sun" size={22} color={typeof color === 'number' ? colors.primary : color ?? colors.primary} /> }} />
+      <Tabs.Screen name="calendar" options={{ title: t.tabMonth, tabBarIcon: ({ color }) => <Feather name="calendar" size={21} color={typeof color === 'number' ? colors.primary : color ?? colors.primary} /> }} />
+      <Tabs.Screen name="qibla" options={{ title: t.tabQibla, tabBarIcon: ({ color }) => <MaterialCommunityIcons name="compass-outline" size={24} color={typeof color === 'number' ? colors.primary : color ?? colors.primary} /> }} />
     </Tabs>
   );
 }

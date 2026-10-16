@@ -65,13 +65,18 @@ export default function TodayScreen() {
       prayers: { ...reminders.prayers, [name]: next },
     });
   };
+  const cycleBeforePrayerMode = () => {
+    const current = reminders.beforePrayer;
+    const next = current === 'off' ? 'vibration' : current === 'vibration' ? 'sound' : 'off';
+    void updatePreferences({ ...reminders, beforePrayer: next });
+  };
   const durationText = (seconds: number) => t.inDuration(Math.floor(seconds / 3600), Math.floor((seconds % 3600) / 60));
 
   return (
     <AppBackground>
       <ScrollView
         contentContainerStyle={[styles.content, { paddingTop: insets.top + webTop + 14 }]}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={() => refresh()} tintColor={colors.primary} />}
+        refreshControl={<RefreshControl refreshing={false} onRefresh={async () => { await refresh(); }} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.topbar}>
@@ -227,6 +232,34 @@ export default function TodayScreen() {
                   </View>
                 );
               })}
+              <View style={[styles.beforePrayerRow, { borderTopColor: colors.border }]}>
+                <View style={[styles.prayerIcon, { backgroundColor: reminders.beforePrayer === 'off' ? colors.muted : colors.secondary }]}>
+                  <Feather name="clock" size={17} color={colors.primary} />
+                </View>
+                <View style={styles.beforePrayerCopy}>
+                  <Text style={[styles.prayerName, { color: colors.foreground }]}>{t.beforePrayerLabel}</Text>
+                  <Text style={[styles.beforePrayerHint, { color: colors.mutedForeground }]}>{t.beforePrayerHint}</Text>
+                </View>
+                <Pressable
+                  testID="before-prayer-reminder"
+                  accessibilityRole="button"
+                  accessibilityLabel={t.reminderLabel(t.beforePrayerLabel, modeLabel(reminders.beforePrayer))}
+                  accessibilityHint={t.reminderHintA11y}
+                  accessibilityState={{ disabled: remindersLoading || remindersSaving || Platform.OS === 'web' }}
+                  disabled={remindersLoading || remindersSaving || Platform.OS === 'web'}
+                  onPress={cycleBeforePrayerMode}
+                  hitSlop={3}
+                  style={({ pressed }) => [
+                    styles.reminderButton,
+                    { backgroundColor: reminders.beforePrayer === 'off' ? 'transparent' : colors.secondary },
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  {reminders.beforePrayer === 'vibration'
+                    ? <MaterialCommunityIcons name="vibrate" size={19} color={colors.primary} />
+                    : <Feather name={reminders.beforePrayer === 'sound' ? 'volume-2' : 'bell-off'} size={17} color={reminders.beforePrayer === 'off' ? colors.mutedForeground : colors.primary} />}
+                </Pressable>
+              </View>
             </View>
             <Text style={[styles.source, { color: colors.mutedForeground }]}>{t.source}</Text>
             {nearestDistanceKm !== null && (
@@ -284,6 +317,9 @@ const styles = StyleSheet.create({
   prayerName: { flex: 1, fontFamily: 'Inter_600SemiBold', fontSize: 15 },
   prayerTime: { fontFamily: 'Inter_700Bold', fontSize: 17, fontVariant: ['tabular-nums'] },
   reminderButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginLeft: 10 },
+  beforePrayerRow: { minHeight: 68, flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, marginTop: 8, paddingTop: 9 },
+  beforePrayerCopy: { flex: 1 },
+  beforePrayerHint: { fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 16, marginTop: 2 },
   source: { textAlign: 'center', fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 15 },
   coordinateSource: { textAlign: 'center', fontFamily: 'Inter_400Regular', fontSize: 10, marginTop: 4 },
   privacyLink: { alignSelf: 'center', padding: 8 },

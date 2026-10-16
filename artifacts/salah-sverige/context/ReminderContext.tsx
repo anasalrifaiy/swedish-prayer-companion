@@ -26,6 +26,7 @@ const OWNER = 'prayer-sverige';
 const VIBRATION_CHANNEL = 'prayer-vibration-v1';
 const SOUND_CHANNEL = 'prayer-sound-v1';
 const LOOKAHEAD_DAYS = Platform.OS === 'ios' ? 12 : 45;
+const IOS_NOTIFICATION_BUDGET = 60;
 
 type ReminderErrorKey =
   | 'errRemindersRead' | 'errAllowNotifications' | 'errChooseCityForReminders'
@@ -45,6 +46,7 @@ type ReminderContextValue = {
 
 const ReminderContext = createContext<ReminderContextValue | null>(null);
 let foregroundModes: ReminderPreferences['prayers'] = defaultReminderPreferences.prayers;
+let foregroundBeforePrayerMode: ReminderPreferences['beforePrayer'] = defaultReminderPreferences.beforePrayer;
 
 const LocalNotifications = {
   AndroidImportance,
@@ -61,10 +63,13 @@ function notificationModule() {
   setNotificationHandler({
     handleNotification: async (notification) => {
       const prayer = notification.request.content.data?.prayer as ReminderPrayer | undefined;
+      const beforePrayer = notification.request.content.data?.beforePrayer === true;
       return {
         shouldShowBanner: true,
         shouldShowList: true,
-        shouldPlaySound: prayer ? foregroundModes[prayer] === 'sound' : false,
+        shouldPlaySound: beforePrayer
+          ? foregroundBeforePrayerMode === 'sound'
+          : prayer ? foregroundModes[prayer] === 'sound' : false,
         shouldSetBadge: false,
       };
     },
@@ -154,12 +159,14 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
       try {
         const Notifications = await notificationModule();
         foregroundModes = snapshot.preferences.prayers;
+        foregroundBeforePrayerMode = snapshot.preferences.beforePrayer;
         const status = await Notifications.getPermissionsAsync();
         setPermissionGranted(status.granted);
         const selectedPrayers = Object.fromEntries(
           reminderPrayers.map((name) => [name, snapshot.preferences.prayers[name] !== 'off']),
         ) as Record<ReminderPrayer, boolean>;
-        if (!Object.values(selectedPrayers).some(Boolean)) {
+        const hasBeforePrayerReminder = snapshot.preferences.beforePrayer !== 'off';
+        if (!Object.values(selectedPrayers).some(Boolean) && !hasBeforePrayerReminder) {
           await cancelOurReminders(Notifications);
           setScheduledCount(0);
           setScheduledUntil(null);
@@ -185,23 +192,41 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
         await ensureChannels(Notifications, snapshot.t);
         // Local date triggers use the phone's time zone. Abroad, deliver in Swedish time via push only.
         const inSwedenTime = Intl.DateTimeFormat().resolvedOptions().timeZone === 'Europe/Stockholm';
+        const remindersPerDay = Object.values(selectedPrayers).filter(Boolean).length
+          + (hasBeforePrayerReminder ? reminderPrayers.length : 0);
+        // Keep a small margin under iOS's 64 pending-notification limit.
+        const lookaheadDays = Platform.OS === 'ios'
+          ? Math.min(LOOKAHEAD_DAYS, Math.floor(IOS_NOTIFICATION_BUDGET / remindersPerDay))
+          : LOOKAHEAD_DAYS;
         const reminders = inSwedenTime ? upcomingPrayerReminders(
-          snapshot.dataset, snapshot.city, selectedPrayers, new Date(), LOOKAHEAD_DAYS,
+          snapshot.dataset,
+          snapshot.city,
+          selectedPrayers,
+          new Date(),
+          lookaheadDays,
+          hasBeforePrayerReminder,
         ) : [];
         await cancelOurReminders(Notifications);
         schedulingStarted = true;
-        for (const { prayer, date } of reminders) {
-          const mode = snapshot.preferences.prayers[prayer];
+        for (const { prayer, date, beforePrayer } of reminders) {
+          const mode = beforePrayer
+            ? snapshot.preferences.beforePrayer
+            : snapshot.preferences.prayers[prayer];
           await Notifications.scheduleNotificationAsync({
             content: {
-              title: `${snapshot.t.prayerNames[prayer]} · ${snapshot.city}`,
-              body: snapshot.t.notificationBody(snapshot.t.prayerNames[prayer], snapshot.city),
+              title: beforePrayer
+                ? snapshot.t.beforePrayerTitle(snapshot.t.prayerNames[prayer])
+                : `${snapshot.t.prayerNames[prayer]} · ${snapshot.city}`,
+              body: beforePrayer
+                ? snapshot.t.beforePrayerBody(snapshot.t.prayerNames[prayer], snapshot.city)
+                : snapshot.t.notificationBody(snapshot.t.prayerNames[prayer], snapshot.city),
               sound: mode === 'sound' ? 'default' : false,
-              data: { owner: OWNER, city: snapshot.city, prayer },
+              data: { owner: OWNER, city: snapshot.city, prayer, beforePrayer },
             },
             trigger: {
               type: Notifications.SchedulableTriggerInputTypes.DATE,
               date,
+              ...(Platform.OS === 'android' ? { delivery: 'alarmClock' as const } : {}),
               ...(Platform.OS === 'android' ? {
                 channelId: mode === 'sound' ? SOUND_CHANNEL : VIBRATION_CHANNEL,
               } : {}),
@@ -231,8 +256,11 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
     setSaving(true);
     try {
       const enabling = Object.values(next.prayers).some((mode) => mode !== 'off')
-        && !Object.values(preferences.prayers).some((mode) => mode !== 'off');
-      if (enabling) {
+        || next.beforePrayer !== 'off';
+      const wasEnabled = Object.values(preferences.prayers).some((mode) => mode !== 'off')
+        || preferences.beforePrayer !== 'off';
+      const requestPermission = enabling && !wasEnabled;
+      if (requestPermission) {
         const Notifications = await notificationModule();
         await ensureChannels(Notifications, t);
         const current = await Notifications.getPermissionsAsync();
