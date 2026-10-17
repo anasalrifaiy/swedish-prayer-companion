@@ -1,8 +1,13 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { AppState, Linking, Platform } from 'react-native';
+import { Alert, AppState, Linking, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAllScheduledNotificationsAsync } from 'expo-notifications/build/getAllScheduledNotificationsAsync';
-import { getPermissionsAsync, requestPermissionsAsync } from 'expo-notifications/build/NotificationPermissions';
+import {
+  getExactAlarmPermissionsAsync,
+  getPermissionsAsync,
+  requestExactAlarmPermissionsAsync,
+  requestPermissionsAsync,
+} from 'expo-notifications/build/NotificationPermissions';
 import { setNotificationHandler } from 'expo-notifications/build/NotificationsHandler';
 import { AndroidImportance } from 'expo-notifications/build/NotificationChannelManager.types';
 import { SchedulableTriggerInputTypes } from 'expo-notifications/build/Notifications.types';
@@ -22,6 +27,7 @@ import {
 } from '@/lib/prayer-reminders';
 
 const STORAGE_KEY = 'prayer-sverige:reminders:v1';
+const EXACT_ALARM_PROMPT_KEY = 'prayer-sverige:exact-alarm-prompted:v1';
 const OWNER = 'prayer-sverige';
 const VIBRATION_CHANNEL = 'prayer-vibration-v1';
 const SOUND_CHANNEL = 'prayer-sound-v1';
@@ -37,6 +43,8 @@ type ReminderContextValue = {
   loading: boolean;
   saving: boolean;
   permissionGranted: boolean | null;
+  exactAlarmGranted: boolean | null;
+  requestExactAlarm: () => Promise<void>;
   error: string | null;
   scheduledCount: number | null;
   scheduledUntil: Date | null;
@@ -114,6 +122,7 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null);
+  const [exactAlarmGranted, setExactAlarmGranted] = useState<boolean | null>(null);
   const [error, setError] = useState<ReminderErrorKey | null>(null);
   const [scheduledCount, setScheduledCount] = useState<number | null>(null);
   const [scheduledUntil, setScheduledUntil] = useState<Date | null>(null);
@@ -141,11 +150,50 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
     return () => { active = false; };
   }, []);
 
+  const checkExactAlarm = async () => {
+    if (Platform.OS !== 'android') return;
+    try {
+      setExactAlarmGranted((await getExactAlarmPermissionsAsync()).granted);
+    } catch { /* leave unknown */ }
+  };
+
+  const requestExactAlarm = async () => {
+    if (Platform.OS !== 'android') return;
+    try {
+      setExactAlarmGranted((await requestExactAlarmPermissionsAsync()).granted);
+    } catch {
+      try { await Linking.sendIntent('android.settings.REQUEST_SCHEDULE_EXACT_ALARM'); }
+      catch { await Linking.openSettings().catch(() => undefined); }
+    }
+  };
+
+  // Ask once at first launch whether the user wants exact alarms at prayer time.
+  useEffect(() => {
+    if (Platform.OS !== 'android' || loading) return;
+    let active = true;
+    (async () => {
+      await checkExactAlarm();
+      let granted: boolean;
+      try { granted = (await getExactAlarmPermissionsAsync()).granted; } catch { return; }
+      if (granted || !active || await AsyncStorage.getItem(EXACT_ALARM_PROMPT_KEY)) return;
+      await AsyncStorage.setItem(EXACT_ALARM_PROMPT_KEY, '1');
+      Alert.alert(t.exactAlarmPromptTitle, t.exactAlarmPromptBody, [
+        { text: t.exactAlarmPromptNo, style: 'cancel' },
+        { text: t.exactAlarmPromptYes, onPress: () => { void requestExactAlarm(); } },
+      ]);
+    })();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
   useEffect(() => {
     if (Platform.OS === 'web') return;
     let state = AppState.currentState;
     const subscription = AppState.addEventListener('change', (next) => {
-      if (state !== 'active' && next === 'active') setRefresh((value) => value + 1);
+      if (state !== 'active' && next === 'active') {
+        setRefresh((value) => value + 1);
+        void checkExactAlarm();
+      }
       state = next;
     });
     return () => subscription.remove();
@@ -283,7 +331,7 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ReminderContext.Provider value={{
-      preferences, loading, saving, permissionGranted, error: error ? t[error] : null, scheduledCount, scheduledUntil,
+      preferences, loading, saving, permissionGranted, exactAlarmGranted, requestExactAlarm, error: error ? t[error] : null, scheduledCount, scheduledUntil,
       updatePreferences,
       openSettings: async () => {
         if (Platform.OS !== 'web') {

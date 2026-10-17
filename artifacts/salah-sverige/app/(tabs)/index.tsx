@@ -24,7 +24,8 @@ export default function TodayScreen() {
   const { city, nearestDistanceKm, today, tomorrow, getDay, loading, locating, error, permission, locate, openSettings, refresh } = usePrayer();
   const {
     preferences: reminders, loading: remindersLoading, saving: remindersSaving,
-    error: reminderError, permissionGranted: reminderPermission, updatePreferences, openSettings: openNotificationSettings,
+    error: reminderError, permissionGranted: reminderPermission, exactAlarmGranted, requestExactAlarm,
+    updatePreferences, openSettings: openNotificationSettings,
   } = useReminders();
   const [now, setNow] = useState(new Date());
   const [dayOffset, setDayOffset] = useState(0);
@@ -46,11 +47,6 @@ export default function TodayScreen() {
   const canGoNext = canNavigate(dayOffset + 1);
   const date = new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long', year: isToday ? undefined : 'numeric' }).format(selectedDate);
   const clock = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-  const openExactAlarmSettings = () => {
-    Linking.sendIntent('android.settings.REQUEST_SCHEDULE_EXACT_ALARM').catch(() => {
-      void Linking.openSettings();
-    });
-  };
   const webTop = Platform.OS === 'web' ? 67 : 0;
   const modeLabel = (mode: string) => (mode === 'off' ? t.modeOff : mode === 'vibration' ? t.modeVibration : t.modeSound);
   const changeDay = (days: number) => {
@@ -100,7 +96,9 @@ export default function TodayScreen() {
           </Pressable>
           <Pressable disabled={isToday} onPress={() => setDayOffset(0)} style={styles.dateButton} accessibilityRole="button" accessibilityLabel={t.backToToday}>
             <Text style={[styles.date, { color: colors.heroForeground }]} numberOfLines={2}>{date}</Text>
-            {!isToday && <Text style={[styles.backToToday, { color: colors.softGold }]}>{t.backToToday}</Text>}
+            {isToday
+              ? <Text style={[styles.backToToday, { color: colors.softGold }]}>{t.backToToday}</Text>
+              : <Feather name="rotate-ccw" size={13} color={colors.softGold} style={{ marginTop: 4 }} />}
           </Pressable>
           <Pressable
             testID="next-day"
@@ -189,11 +187,39 @@ export default function TodayScreen() {
                   <Text style={[styles.reminderSettings, { color: colors.primary }]}>{t.openNotificationSettings}</Text>
                 </Pressable>
               )}
-              {Platform.OS === 'android' && reminderPermission && (
-                <Pressable onPress={openExactAlarmSettings} accessibilityRole="button">
+              {Platform.OS === 'android' && reminderPermission && exactAlarmGranted === false && (
+                <Pressable onPress={() => { void requestExactAlarm(); }} accessibilityRole="button">
                   <Text style={[styles.reminderSettings, { color: colors.primary }]}>{t.exactAlarmSettings}</Text>
                 </Pressable>
               )}
+              <View style={[styles.beforePrayerRow, { borderBottomColor: colors.border }]}>
+                <View style={[styles.prayerIcon, { backgroundColor: reminders.beforePrayer === 'off' ? colors.muted : colors.secondary }]}>
+                  <Feather name="clock" size={17} color={colors.primary} />
+                </View>
+                <View style={styles.beforePrayerCopy}>
+                  <Text style={[styles.prayerName, { color: colors.foreground }]}>{t.beforePrayerLabel}</Text>
+                  <Text style={[styles.beforePrayerHint, { color: colors.mutedForeground }]}>{t.beforePrayerHint}</Text>
+                </View>
+                <Pressable
+                  testID="before-prayer-reminder"
+                  accessibilityRole="button"
+                  accessibilityLabel={t.reminderLabel(t.beforePrayerLabel, modeLabel(reminders.beforePrayer))}
+                  accessibilityHint={t.reminderHintA11y}
+                  accessibilityState={{ disabled: remindersLoading || remindersSaving || Platform.OS === 'web' }}
+                  disabled={remindersLoading || remindersSaving || Platform.OS === 'web'}
+                  onPress={cycleBeforePrayerMode}
+                  hitSlop={3}
+                  style={({ pressed }) => [
+                    styles.reminderButton,
+                    { backgroundColor: reminders.beforePrayer === 'off' ? 'transparent' : colors.secondary },
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  {reminders.beforePrayer === 'vibration'
+                    ? <MaterialCommunityIcons name="vibrate" size={19} color={colors.primary} />
+                    : <Feather name={reminders.beforePrayer === 'sound' ? 'volume-2' : 'bell-off'} size={17} color={reminders.beforePrayer === 'off' ? colors.mutedForeground : colors.primary} />}
+                </Pressable>
+              </View>
               {!selectedDay && !loading && <Text style={[styles.reminderError, { color: colors.mutedForeground }]}>{t.noDataForDay}</Text>}
               {prayers.map((name, index) => {
                  const active = isToday && state.next?.name === name && state.next.time.getDate() === now.getDate();
@@ -231,35 +257,7 @@ export default function TodayScreen() {
                     )}
                   </View>
                 );
-              })}
-              <View style={[styles.beforePrayerRow, { borderTopColor: colors.border }]}>
-                <View style={[styles.prayerIcon, { backgroundColor: reminders.beforePrayer === 'off' ? colors.muted : colors.secondary }]}>
-                  <Feather name="clock" size={17} color={colors.primary} />
-                </View>
-                <View style={styles.beforePrayerCopy}>
-                  <Text style={[styles.prayerName, { color: colors.foreground }]}>{t.beforePrayerLabel}</Text>
-                  <Text style={[styles.beforePrayerHint, { color: colors.mutedForeground }]}>{t.beforePrayerHint}</Text>
-                </View>
-                <Pressable
-                  testID="before-prayer-reminder"
-                  accessibilityRole="button"
-                  accessibilityLabel={t.reminderLabel(t.beforePrayerLabel, modeLabel(reminders.beforePrayer))}
-                  accessibilityHint={t.reminderHintA11y}
-                  accessibilityState={{ disabled: remindersLoading || remindersSaving || Platform.OS === 'web' }}
-                  disabled={remindersLoading || remindersSaving || Platform.OS === 'web'}
-                  onPress={cycleBeforePrayerMode}
-                  hitSlop={3}
-                  style={({ pressed }) => [
-                    styles.reminderButton,
-                    { backgroundColor: reminders.beforePrayer === 'off' ? 'transparent' : colors.secondary },
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  {reminders.beforePrayer === 'vibration'
-                    ? <MaterialCommunityIcons name="vibrate" size={19} color={colors.primary} />
-                    : <Feather name={reminders.beforePrayer === 'sound' ? 'volume-2' : 'bell-off'} size={17} color={reminders.beforePrayer === 'off' ? colors.mutedForeground : colors.primary} />}
-                </Pressable>
-              </View>
+              }              )}
             </View>
             <Text style={[styles.source, { color: colors.mutedForeground }]}>{t.source}</Text>
             {nearestDistanceKm !== null && (
@@ -317,7 +315,7 @@ const styles = StyleSheet.create({
   prayerName: { flex: 1, fontFamily: 'Inter_600SemiBold', fontSize: 15 },
   prayerTime: { fontFamily: 'Inter_700Bold', fontSize: 17, fontVariant: ['tabular-nums'] },
   reminderButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginLeft: 10 },
-  beforePrayerRow: { minHeight: 68, flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, marginTop: 8, paddingTop: 9 },
+  beforePrayerRow: { minHeight: 68, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, marginTop: 8, paddingBottom: 9 },
   beforePrayerCopy: { flex: 1 },
   beforePrayerHint: { fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 16, marginTop: 2 },
   source: { textAlign: 'center', fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 15 },
