@@ -6,6 +6,7 @@ import * as Location from 'expo-location';
 import { getGetPrayerTimesQueryKey } from '@workspace/api-client-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { apiBaseUrl } from '@/lib/api-config';
+import { authorityFor, globalDataset, GlobalPlace } from '@/lib/global-prayer';
 import {
   nearestSupportedCity,
   normalizePrayerDataset,
@@ -31,7 +32,16 @@ class TableHttpError extends Error {
 
 type CachedPrayerDataset = { calendarYear: number; dataset: PrayerDataset };
 type LocationMode = 'automatic' | 'manual';
-type CachedLocation = { version: 1; city: string | null; mode: LocationMode };
+type CachedLocation = { version: 1; city: string | null; mode: LocationMode; globalPlace?: GlobalPlace | null };
+
+function isGlobalPlace(value: unknown): value is GlobalPlace {
+  if (!value || typeof value !== 'object') return false;
+  const place = value as Partial<GlobalPlace>;
+  return typeof place.name === 'string'
+    && Number.isFinite(place.latitude)
+    && Number.isFinite(place.longitude)
+    && (place.countryCode === null || typeof place.countryCode === 'string');
+}
 
 function isCachedPrayerDataset(value: unknown): value is CachedPrayerDataset {
   if (!value || typeof value !== 'object') return false;
@@ -51,9 +61,11 @@ function isCachedLocation(value: unknown): value is CachedLocation {
 }
 
 type Coordinates = { latitude: number; longitude: number };
-type WebPlace = { countryCode?: string };
+type WebPlace = { countryCode?: string; city?: string; locality?: string; countryName?: string };
 type PrayerContextValue = {
   dataset?: PrayerDataset;
+  swedishCities: string[];
+  globalMethod: string | null;
   city: string | null;
   nearestDistanceKm: number | null;
   coordinates: Coordinates | null;
@@ -80,6 +92,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
   const [permission, requestPermission] = Location.useForegroundPermissions();
   const [city, setCity] = useState<string | null>(null);
   const [locationMode, setLocationMode] = useState<LocationMode>('automatic');
+  const [globalPlace, setGlobalPlace] = useState<GlobalPlace | null>(null);
   const [nearestDistanceKm, setNearestDistanceKm] = useState<number | null>(null);
   const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
   const [locating, setLocating] = useState(false);
@@ -117,6 +130,9 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
           if (isCachedLocation(cachedLocation)) {
             setCity(cachedLocation.city);
             setLocationMode(cachedLocation.mode);
+            if (isGlobalPlace(cachedLocation.globalPlace) && cachedLocation.globalPlace.name === cachedLocation.city) {
+              setGlobalPlace(cachedLocation.globalPlace);
+            }
           } else {
             await AsyncStorage.removeItem(LOCATION_CACHE_KEY);
           }
@@ -158,20 +174,21 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       version: 1,
       city,
       mode: locationMode,
+      globalPlace,
     } satisfies CachedLocation)).catch(() => {
       setLocationError('errCitySave');
     });
-  }, [tableCacheReady, city, locationMode]);
+  }, [tableCacheReady, city, locationMode, globalPlace]);
 
   React.useEffect(() => {
-    if (query.data && city && !query.data.cities.includes(city)) {
+    if (query.data && city && !globalPlace && !query.data.cities.includes(city)) {
       autoLocateStartedRef.current = false;
       setCity(null);
       setLocationMode('automatic');
       setNearestDistanceKm(null);
       setLocationError('errSavedCityMissing');
     }
-  }, [query.data, city]);
+  }, [query.data, city, globalPlace]);
 
   const refreshLocation = async () => {
     if (locatingRef.current) return;
@@ -206,22 +223,37 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       }
       setCoordinates(coords);
       let countryCode: string | null | undefined;
+      let placeName: string | undefined;
       if (Platform.OS === 'web') {
         const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${coords.latitude}&longitude=${coords.longitude}&localityLanguage=sv`);
         if (!response.ok) throw new Error('Geocoding failed');
         const place: WebPlace = await response.json();
         countryCode = place.countryCode;
+        placeName = place.city || place.locality || place.countryName;
       } else {
         const places = await Location.reverseGeocodeAsync(coords);
         countryCode = places[0]?.isoCountryCode;
+        placeName = places[0]?.city ?? places[0]?.subregion ?? places[0]?.region ?? places[0]?.country ?? undefined;
       }
-      if (countryCode?.toUpperCase() !== 'SE') {
+      // If the geocoder gives no country, fall back to a rough Sweden bounding box.
+      const inSwedenBox = coords.latitude >= 55 && coords.latitude <= 69.5
+        && coords.longitude >= 10.5 && coords.longitude <= 24.5;
+      const inSweden = countryCode ? countryCode.toUpperCase() === 'SE' : inSwedenBox;
+      if (!inSweden) {
         if (manualSelectionRef.current === selectionAtStart) {
+          const name = placeName || `${coords.latitude.toFixed(2)}, ${coords.longitude.toFixed(2)}`;
+          setGlobalPlace({
+            name,
+            countryCode: countryCode?.toUpperCase() ?? null,
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+          });
+          setCity(name);
           setNearestDistanceKm(null);
         }
-        setLocationError(countryCode ? 'errOutsideSweden' : 'errCannotConfirmSweden');
         return;
       }
+      if (manualSelectionRef.current === selectionAtStart) setGlobalPlace(null);
       const dataset = query.data ?? (await query.refetch()).data;
       if (!dataset) {
         setLocationError('errTableLoad');
@@ -286,20 +318,25 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.remove();
   }, [permission?.granted, locationMode]);
 
-  const month = city ? query.data?.tables[city]?.[String(date.getMonth() + 1)] ?? [] : [];
+  const year = date.getFullYear();
+  const globalData = useMemo(() => (globalPlace ? globalDataset(globalPlace, year) : undefined), [globalPlace, year]);
+  const activeDataset = globalData ?? query.data;
+  const month = city ? activeDataset?.tables[city]?.[String(date.getMonth() + 1)] ?? [] : [];
   const getDay = (target: Date) => (city
-    ? query.data?.tables[city]?.[String(target.getMonth() + 1)]?.find((day) => day.day === target.getDate())
+    ? activeDataset?.tables[city]?.[String(target.getMonth() + 1)]?.find((day) => day.day === target.getDate())
     : undefined);
   const today = month.find((day) => day.day === date.getDate());
   const nextDate = new Date(date);
   nextDate.setDate(date.getDate() + 1);
   const tomorrow = getDay(nextDate);
-  const queryErrorMessage = query.error instanceof TableHttpError
+  const queryErrorMessage = globalPlace ? null : query.error instanceof TableHttpError
     ? t.errTableHttp(query.error.status)
     : query.error instanceof Error ? query.error.message : null;
   const value = useMemo<PrayerContextValue>(
     () => ({
-      dataset: query.data,
+      dataset: activeDataset,
+      swedishCities: query.data?.cities ?? [],
+      globalMethod: globalPlace ? authorityFor(globalPlace.countryCode).label : null,
       city,
       nearestDistanceKm,
       coordinates,
@@ -307,7 +344,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       tomorrow,
       month,
       getDay,
-      loading: !tableCacheReady || query.isLoading,
+      loading: !tableCacheReady || (!globalPlace && query.isLoading),
       locating,
       error: (locationErrorKey ? t[locationErrorKey] : null) ?? queryErrorMessage,
       locationErrorKey,
@@ -315,6 +352,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       locate,
       selectCity: (selectedCity) => {
         manualSelectionRef.current += 1;
+        setGlobalPlace(null);
         setCity(selectedCity);
         setLocationMode('manual');
         setNearestDistanceKm(null);
@@ -325,7 +363,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       },
       refresh: query.refetch,
     }),
-    [query.data, tableCacheReady, query.isLoading, queryErrorMessage, query.refetch, city, nearestDistanceKm, coordinates, today, tomorrow, month, locating, locationErrorKey, t, permission],
+    [activeDataset, globalPlace, query.data, tableCacheReady, query.isLoading, queryErrorMessage, query.refetch, city, nearestDistanceKm, coordinates, today, tomorrow, month, locating, locationErrorKey, t, permission],
   );
   return <PrayerContext.Provider value={value}>{children}</PrayerContext.Provider>;
 }

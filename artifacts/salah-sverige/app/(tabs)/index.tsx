@@ -21,7 +21,7 @@ export default function TodayScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { t, locale, isRTL } = useLanguage();
-  const { city, nearestDistanceKm, today, tomorrow, getDay, loading, locating, error, permission, locate, openSettings, refresh } = usePrayer();
+  const { city, nearestDistanceKm, globalMethod, today, tomorrow, getDay, loading, locating, error, permission, locate, openSettings, refresh } = usePrayer();
   const {
     preferences: reminders, loading: remindersLoading, saving: remindersSaving,
     error: reminderError, permissionGranted: reminderPermission, exactAlarmGranted, requestExactAlarm,
@@ -259,7 +259,7 @@ export default function TodayScreen() {
                 </Pressable>
               </View>
             </View>
-            <Text style={[styles.source, { color: colors.mutedForeground }]}>{t.source}</Text>
+            <Text style={[styles.source, { color: colors.mutedForeground }]}>            {globalMethod ? t.calculatedSource(globalMethod) : t.source}</Text>
             {nearestDistanceKm !== null && (
               <Text style={[styles.coordinateSource, { color: colors.mutedForeground }]}>{t.coordinateSource}</Text>
             )}

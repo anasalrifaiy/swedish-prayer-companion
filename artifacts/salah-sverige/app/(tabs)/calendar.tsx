@@ -11,7 +11,7 @@ import { useColors } from '@/hooks/useColors';
 export default function CalendarScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { city, nearestDistanceKm, month } = usePrayer();
+  const { city, nearestDistanceKm, month, globalMethod } = usePrayer();
   const { t, locale } = useLanguage();
   const now = new Date();
   const monthName = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(now);
@@ -52,7 +52,7 @@ export default function CalendarScreen() {
           })}
           {!!city && (
             <Text style={[styles.source, { color: colors.mutedForeground }]}>
-              {nearestDistanceKm !== null ? t.sourceWithCoords : t.source}
+              {globalMethod ? t.calculatedSource(globalMethod) : nearestDistanceKm !== null ? t.sourceWithCoords : t.source}
             </Text>
           )}
         </ScrollView>

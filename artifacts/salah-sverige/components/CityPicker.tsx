@@ -10,10 +10,10 @@ import { normalizePlace } from '@/lib/prayer';
 export function CityPicker({ compact = false }: { compact?: boolean }) {
   const colors = useColors();
   const { t } = useLanguage();
-  const { city, dataset, selectCity, locate, locating } = usePrayer();
+  const { city, swedishCities, selectCity, locate, locating } = usePrayer();
   const [visible, setVisible] = useState(false);
   const [query, setQuery] = useState('');
-  const filtered = (dataset?.cities ?? []).filter((item) => normalizePlace(item).includes(normalizePlace(query)));
+  const filtered = swedishCities.filter((item) => normalizePlace(item).includes(normalizePlace(query)));
   return (
     <>
       <Pressable

@@ -116,6 +116,7 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
     locationErrorKey,
     loading: prayerLoading,
     locating,
+    globalMethod,
   } = usePrayer();
   const { t, language } = useLanguage();
   const [preferences, setPreferences] = useState(defaultReminderPreferences);
@@ -201,7 +202,7 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading || prayerLoading || (locating && !city) || Platform.OS === 'web') return;
-    const snapshot = { preferences, city, dataset, locationErrorKey, t };
+    const snapshot = { preferences, city, dataset, locationErrorKey, t, isGlobal: !!globalMethod };
     queue.current = queue.current.catch(() => undefined).then(async () => {
       let schedulingStarted = false;
       try {
@@ -238,8 +239,10 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         await ensureChannels(Notifications, snapshot.t);
-        // Local date triggers use the phone's time zone. Abroad, deliver in Swedish time via push only.
-        const inSwedenTime = Intl.DateTimeFormat().resolvedOptions().timeZone === 'Europe/Stockholm';
+        // Local date triggers use the phone's time zone. Abroad in Sweden's data, deliver in Swedish time via push only.
+        // Calculated global times already follow the phone's own time zone.
+        const inSwedenTime = snapshot.isGlobal
+          || Intl.DateTimeFormat().resolvedOptions().timeZone === 'Europe/Stockholm';
         const remindersPerDay = Object.values(selectedPrayers).filter(Boolean).length
           + (hasBeforePrayerReminder ? reminderPrayers.length : 0);
         // Keep a small margin under iOS's 64 pending-notification limit.
@@ -297,7 +300,7 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
         setError('errRemindersUpdate');
       }
     });
-  }, [loading, prayerLoading, locating, preferences, city, dataset, locationErrorKey, language, refresh]);
+  }, [loading, prayerLoading, locating, preferences, city, dataset, globalMethod, locationErrorKey, language, refresh]);
 
   const updatePreferences = async (next: ReminderPreferences) => {
     if (saving || loading || Platform.OS === 'web') return;
