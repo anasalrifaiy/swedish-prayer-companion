@@ -41,8 +41,8 @@ const sv = {
   openNotificationSettings: 'Öppna aviseringsinställningar',
   reminderLabel: (prayer: string, mode: string) => `Påminnelse för ${prayer}: ${mode}`,
   reminderHintA11y: 'Tryck för att växla mellan av, vibration och ljud.',
-  beforePrayerLabel: '15 min före varje bön',
-  beforePrayerHint: 'Få en förvarning så att du hinner förbereda dig.',
+  beforePrayerLabel: 'Sista chansen: 15 min kvar',
+  beforePrayerHint: 'Påminnelse om du glömt bönen, 15 min innan nästa bön börjar.',
   modeOff: 'av',
   modeVibration: 'vibration',
   modeSound: 'ljud',
@@ -109,8 +109,8 @@ const sv = {
   channelVibration: 'Bönetider · vibration',
   channelSound: 'Bönetider · ljud',
   notificationBody: (prayer: string, city: string) => `Det är dags för ${prayer} enligt tabellen för ${city}.`,
-  beforePrayerTitle: (prayer: string) => `Förbered dig för ${prayer}`,
-  beforePrayerBody: (prayer: string, city: string) => `${prayer} börjar om 15 minuter enligt tabellen för ${city}.`,
+  beforePrayerTitle: (prayer: string) => `Har du bett ${prayer}?`,
+  beforePrayerBody: (prayer: string, city: string) => `Det är 15 minuter kvar av ${prayer}s tid i ${city}. Be innan nästa bön börjar.`,
 };
 
 export type Strings = typeof sv;
@@ -146,8 +146,8 @@ const en: Strings = {
   openNotificationSettings: 'Open notification settings',
   reminderLabel: (prayer, mode) => `Reminder for ${prayer}: ${mode}`,
   reminderHintA11y: 'Tap to switch between off, vibration and sound.',
-  beforePrayerLabel: '15 min before each prayer',
-  beforePrayerHint: 'Get a gentle heads-up so you can prepare.',
+  beforePrayerLabel: 'Last chance: 15 min left',
+  beforePrayerHint: 'A reminder if you forgot to pray, 15 min before the next prayer begins.',
   modeOff: 'off',
   modeVibration: 'vibration',
   modeSound: 'sound',
@@ -214,8 +214,8 @@ const en: Strings = {
   channelVibration: 'Prayer times · vibration',
   channelSound: 'Prayer times · sound',
   notificationBody: (prayer, city) => `It's time for ${prayer} according to the timetable for ${city}.`,
-  beforePrayerTitle: (prayer) => `Get ready for ${prayer}`,
-  beforePrayerBody: (prayer, city) => `${prayer} begins in 15 minutes according to the timetable for ${city}.`,
+  beforePrayerTitle: (prayer) => `Have you prayed ${prayer}?`,
+  beforePrayerBody: (prayer, city) => `${prayer} time ends in 15 minutes in ${city}. Pray before the next prayer begins.`,
 };
 
 const ar: Strings = {
@@ -249,8 +249,8 @@ const ar: Strings = {
   openNotificationSettings: 'فتح إعدادات الإشعارات',
   reminderLabel: (prayer, mode) => `تنبيه ${prayer}: ${mode}`,
   reminderHintA11y: 'اضغط للتبديل بين إيقاف والاهتزاز والصوت.',
-  beforePrayerLabel: 'قبل كل صلاة بـ 15 دقيقة',
-  beforePrayerHint: 'تنبيه مبكر يمنحك وقتاً للاستعداد.',
+  beforePrayerLabel: 'الفرصة الأخيرة: بقي 15 دقيقة',
+  beforePrayerHint: 'تذكير لمن نسي الصلاة، قبل دخول وقت الصلاة التالية بـ 15 دقيقة.',
   modeOff: 'إيقاف',
   modeVibration: 'اهتزاز',
   modeSound: 'صوت',
@@ -317,8 +317,8 @@ const ar: Strings = {
   channelVibration: 'مواقيت الصلاة · اهتزاز',
   channelSound: 'مواقيت الصلاة · صوت',
   notificationBody: (prayer, city) => `حان وقت ${prayer} حسب جدول ${city}.`,
-  beforePrayerTitle: (prayer) => `استعد لصلاة ${prayer}`,
-  beforePrayerBody: (prayer, city) => `تبقى 15 دقيقة على صلاة ${prayer} حسب جدول ${city}.`,
+  beforePrayerTitle: (prayer) => `هل صليت ${prayer}؟`,
+  beforePrayerBody: (prayer, city) => `بقي 15 دقيقة على انتهاء وقت ${prayer} في ${city}. صلِّ قبل دخول وقت الصلاة التالية.`,
 };
 
 export const translations: Record<Language, Strings> = { sv, en, ar };

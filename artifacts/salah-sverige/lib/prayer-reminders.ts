@@ -35,6 +35,14 @@ export function readReminderPreferences(value: string | null): ReminderPreferenc
   }
 }
 
+// Isha is omitted: its window runs until the next day's Fajr.
+const prayerWindowEnd: Partial<Record<ReminderPrayer, PrayerName>> = {
+  Fajr: 'Shuruk',
+  Dhuhr: 'Asr',
+  Asr: 'Maghrib',
+  Maghrib: 'Isha',
+};
+
 export type ScheduledPrayerReminder = {
   prayer: ReminderPrayer;
   date: Date;
@@ -69,9 +77,16 @@ export function upcomingPrayerReminders(
       if (selected[prayer] && prayerDate > now) {
         reminders.push({ prayer, date: prayerDate, beforePrayer: false });
       }
-      const advanceDate = new Date(prayerDate.getTime() - 15 * 60 * 1000);
-      if (beforePrayer && advanceDate > now) {
-        reminders.push({ prayer, date: advanceDate, beforePrayer: true });
+      // Last-chance reminder: 15 minutes before the prayer's window ends.
+      const endName = prayerWindowEnd[prayer];
+      const endMatch = endName ? /^(\d{1,2}):(\d{2})$/.exec(day[endName]) : null;
+      if (beforePrayer && endMatch) {
+        const endDate = new Date(dayDate);
+        endDate.setHours(Number(endMatch[1]), Number(endMatch[2]), 0, 0);
+        const lastChance = new Date(endDate.getTime() - 15 * 60 * 1000);
+        if (lastChance > prayerDate && lastChance > now) {
+          reminders.push({ prayer, date: lastChance, beforePrayer: true });
+        }
       }
     }
   }
