@@ -7,6 +7,7 @@ import { getGetPrayerTimesQueryKey } from '@workspace/api-client-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { apiBaseUrl } from '@/lib/api-config';
 import { authorityFor, globalDataset, GlobalPlace } from '@/lib/global-prayer';
+import { automaticLocationAction } from '@/lib/location-policy';
 import {
   nearestSupportedCity,
   normalizePrayerDataset,
@@ -89,7 +90,7 @@ const PrayerContext = createContext<PrayerContextValue | null>(null);
 export function PrayerProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const [tableCacheReady, setTableCacheReady] = useState(false);
-  const [permission, requestPermission] = Location.useForegroundPermissions();
+  const [permission, requestPermission, getPermission] = Location.useForegroundPermissions();
   const [city, setCity] = useState<string | null>(null);
   const [locationMode, setLocationMode] = useState<LocationMode>('automatic');
   const [globalPlace, setGlobalPlace] = useState<GlobalPlace | null>(null);
@@ -253,7 +254,6 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
         }
         return;
       }
-      if (manualSelectionRef.current === selectionAtStart) setGlobalPlace(null);
       const dataset = query.data ?? (await query.refetch()).data;
       if (!dataset) {
         setLocationError('errTableLoad');
@@ -262,6 +262,7 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       const nearest = nearestSupportedCity(dataset.cities, coords);
       if (nearest) {
         if (manualSelectionRef.current === selectionAtStart) {
+          setGlobalPlace(null);
           setCity(nearest.city);
           setNearestDistanceKm(nearest.distanceKm);
         }
@@ -283,11 +284,13 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
   // Locate once when the page opens, then refresh GPS whenever the app returns
   // to the foreground after location access has been granted.
   React.useEffect(() => {
-    if (locationMode !== 'automatic' || !permission || !tableCacheReady || autoLocateStartedRef.current) return;
-    if (!permission.granted && (Platform.OS === 'web' || permission.status !== 'undetermined')) return;
+    const action = automaticLocationAction(
+      locationMode, permission, tableCacheReady, autoLocateStartedRef.current, Platform.OS === 'web',
+    );
+    if (action !== 'locate') return;
     autoLocateStartedRef.current = true;
     void refreshLocation();
-  }, [permission?.status, permission?.granted, tableCacheReady, locationMode]);
+  }, [permission?.status, permission?.granted, permission?.canAskAgain, tableCacheReady, locationMode]);
   const locateRef = useRef(refreshLocation);
   locateRef.current = refreshLocation;
   React.useEffect(() => {
@@ -307,16 +310,22 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
     }
     let previousState = AppState.currentState;
     const subscription = AppState.addEventListener('change', (nextState) => {
-      if (locationMode === 'automatic'
-        && previousState !== 'active'
-        && nextState === 'active'
-        && (permission?.granted || hasLocationAccessRef.current)) {
-        void locateRef.current();
+      if (previousState !== 'active' && nextState === 'active') {
+        const selectionAtResume = manualSelectionRef.current;
+        void getPermission().then((currentPermission) => {
+          if (manualSelectionRef.current !== selectionAtResume) return;
+          if (locationMode === 'automatic' && currentPermission.granted && autoLocateStartedRef.current) {
+            void locateRef.current();
+          }
+        }).catch((error: unknown) => {
+          console.error('Unable to refresh location permission:', error);
+          setLocationError('errLocationRead');
+        });
       }
       previousState = nextState;
     });
     return () => subscription.remove();
-  }, [permission?.granted, locationMode]);
+  }, [permission?.granted, locationMode, getPermission]);
 
   const year = date.getFullYear();
   const globalData = useMemo(() => (globalPlace ? globalDataset(globalPlace, year) : undefined), [globalPlace, year]);

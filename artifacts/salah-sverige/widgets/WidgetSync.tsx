@@ -5,9 +5,18 @@ import { usePrayer } from '@/context/PrayerContext';
 
 async function refreshPrayerWidgets() {
   // The widget library has no web implementation, so load it only on Android.
-  const { requestWidgetUpdate } = await import('react-native-android-widget');
+  const { getWidgetInfo, requestWidgetUpdateById } = await import('react-native-android-widget');
   const { PRAYER_WIDGET_NAME, renderPrayerWidget } = await import('./render');
-  await requestWidgetUpdate({ widgetName: PRAYER_WIDGET_NAME, renderWidget: renderPrayerWidget });
+  const widgets = await getWidgetInfo(PRAYER_WIDGET_NAME);
+  await Promise.all(widgets.map(({ widgetId }) => requestWidgetUpdateById({
+    widgetName: PRAYER_WIDGET_NAME,
+    widgetId,
+    renderWidget: renderPrayerWidget,
+  })));
+}
+
+function reportWidgetError(error: unknown) {
+  console.error('Unable to refresh prayer widgets:', error);
 }
 
 // Redraws the home/lock-screen widget whenever what it shows may have changed.
@@ -18,14 +27,14 @@ export function WidgetSync() {
   useEffect(() => {
     if (Platform.OS !== 'android') return;
     // Give the context time to persist the new city before the widget reads it.
-    const timer = setTimeout(() => { void refreshPrayerWidgets().catch(() => undefined); }, 1500);
+    const timer = setTimeout(() => { void refreshPrayerWidgets().catch(reportWidgetError); }, 1500);
     return () => clearTimeout(timer);
   }, [city, dataset, language]);
 
   useEffect(() => {
     if (Platform.OS !== 'android') return;
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void refreshPrayerWidgets().catch(() => undefined);
+      if (state === 'active') void refreshPrayerWidgets().catch(reportWidgetError);
     });
     return () => subscription.remove();
   }, []);

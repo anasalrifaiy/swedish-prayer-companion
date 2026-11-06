@@ -119,6 +119,11 @@ export default function TodayScreen() {
           </Text>
         )}
         {!!city && !!error && <Text style={[styles.locationWarning, { color: colors.softGold }]}>{error}</Text>}
+        {!!city && permission?.status === 'denied' && !permission.canAskAgain && (
+          <Pressable onPress={openSettings}>
+            <Text style={[styles.locationWarning, { color: colors.softGold }]}>{t.openSettings}</Text>
+          </Pressable>
+        )}
 
         {!city ? (
           <View style={[styles.permissionCard, { backgroundColor: colors.card }]}>

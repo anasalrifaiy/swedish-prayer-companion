@@ -1,3 +1,5 @@
+'use no memo';
+
 import React from 'react';
 import { FlexWidget, TextWidget } from 'react-native-android-widget';
 import { translations } from '@/lib/i18n';
