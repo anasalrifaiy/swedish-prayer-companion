@@ -15,8 +15,8 @@ import {
   PrayerDataset,
 } from '@/lib/prayer';
 
-const PRAYER_CACHE_KEY = 'prayer-sverige:official-timetable:v1';
-const LOCATION_CACHE_KEY = 'prayer-sverige:location:v1';
+import { LOCATION_CACHE_KEY, PRAYER_CACHE_KEY } from '@/lib/storage-keys';
+
 const prayerQueryKey = getGetPrayerTimesQueryKey();
 
 export type LocationErrorKey =

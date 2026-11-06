@@ -1,8 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { intlLocales, Language, languages, Strings, translations } from '@/lib/i18n';
-
-const LANGUAGE_KEY = 'prayer-sverige:language:v1';
+import { LANGUAGE_KEY } from '@/lib/storage-keys';
 
 type LanguageContextValue = {
   language: Language;

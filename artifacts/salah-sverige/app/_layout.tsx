@@ -8,6 +8,7 @@ import { apiBaseUrl } from '@/lib/api-config';
 import { LanguageProvider } from '@/context/LanguageContext';
 import { PrayerProvider } from '@/context/PrayerContext';
 import { ReminderProvider } from '@/context/ReminderContext';
+import { WidgetSync } from '@/widgets/WidgetSync';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -39,6 +40,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <LanguageProvider>
             <PrayerProvider>
+              <WidgetSync />
               <ReminderProvider>
                 <GestureHandlerRootView style={{ flex: 1 }}>
                   <Stack screenOptions={{ headerShown: false }}>

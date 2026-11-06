@@ -30,6 +30,25 @@
       "expo-router",
       "expo-notifications",
       [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "PrayerTimes",
+              "label": "Prayer times",
+              "description": "The five daily prayer times, the current and the next prayer.",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "widgetCategory": "home_screen|keyguard",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
+      ],
+      [
         "expo-location",
         {
           "locationWhenInUsePermission": "Prayer Sverige använder din plats för att välja närmaste svenska tabellstad och visa Qibla."
