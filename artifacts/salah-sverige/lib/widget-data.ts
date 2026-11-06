@@ -1,8 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { globalDay, GlobalPlace } from './global-prayer';
 import { Language, languages } from './i18n';
 import { getPrayerState, PrayerDataset, PrayerDay } from './prayer';
-import { LANGUAGE_KEY, LOCATION_CACHE_KEY, PRAYER_CACHE_KEY } from './storage-keys';
+import { LANGUAGE_KEY, WIDGET_CACHE_KEY } from './storage-keys';
 
 export const widgetPrayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'] as const;
 export type WidgetPrayer = (typeof widgetPrayers)[number];
@@ -18,38 +17,56 @@ export type WidgetData =
       next: { name: WidgetPrayer; time: string } | null;
     };
 
-type Place = { city: string; globalPlace: GlobalPlace | null };
+export type WidgetSnapshot = {
+  version: 1;
+  year: number;
+  city: string | null;
+  language: Language;
+  months: Record<string, PrayerDay[]> | null;
+};
 
-function dayFor(place: Place, dataset: PrayerDataset | null, date: Date): PrayerDay | undefined {
-  if (place.globalPlace) return globalDay(place.globalPlace, date);
-  return dataset?.tables[place.city]?.[String(date.getMonth() + 1)]
-    ?.find((entry) => entry.day === date.getDate());
-}
-
-export function buildWidgetData(
-  place: Place | null,
-  dataset: PrayerDataset | null,
+export function makeWidgetSnapshot(
+  city: string | null,
+  dataset: PrayerDataset | undefined,
   language: Language,
   now: Date,
-): WidgetData {
-  if (!place) return { status: 'empty', language };
-  const tomorrowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  const today = dayFor(place, dataset, now);
+): WidgetSnapshot {
+  return {
+    version: 1,
+    year: now.getFullYear(),
+    city,
+    language,
+    months: city ? dataset?.tables[city] ?? null : null,
+  };
+}
+
+export function preserveWidgetSnapshot(current: WidgetSnapshot, previous: WidgetSnapshot | null): WidgetSnapshot {
+  if (current.city && !current.months && previous?.city === current.city
+    && previous.year === current.year && previous.months) {
+    return { ...previous, language: current.language };
+  }
+  return current;
+}
+
+export function buildWidgetData(snapshot: WidgetSnapshot, now: Date): WidgetData {
+  const { city, language, months, year } = snapshot;
+  if (!city || !months || year !== now.getFullYear()) return { status: 'empty', language };
+  const today = months[String(now.getMonth() + 1)]?.find((entry) => entry.day === now.getDate());
   if (!today) return { status: 'empty', language };
-  const tomorrow = dayFor(place, dataset, tomorrowDate);
+  const tomorrowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const tomorrow = tomorrowDate.getFullYear() === year
+    ? months[String(tomorrowDate.getMonth() + 1)]?.find((entry) => entry.day === tomorrowDate.getDate())
+    : undefined;
   const state = getPrayerState(today, now, tomorrow);
-  // Before Fajr the prayer period we are still in is last night's Isha.
-  const current = (state.current?.name ?? 'Isha') as WidgetPrayer;
-  const next = state.next
-    ? { name: state.next.name as WidgetPrayer, time: pad(state.next.time) }
-    : null;
   return {
     status: 'ready',
     language,
-    city: place.city,
+    city,
     times: widgetPrayers.map((name) => ({ name, time: today[name] })),
-    current,
-    next,
+    current: (state.current?.name ?? 'Isha') as WidgetPrayer,
+    next: state.next
+      ? { name: state.next.name as WidgetPrayer, time: pad(state.next.time) }
+      : null,
   };
 }
 
@@ -57,33 +74,34 @@ function pad(date: Date) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
-function parse(value: string | null): unknown {
-  if (!value) return null;
-  try { return JSON.parse(value); } catch { return null; }
+export async function saveWidgetSnapshot(snapshot: WidgetSnapshot): Promise<void> {
+  await AsyncStorage.setItem(WIDGET_CACHE_KEY, JSON.stringify(snapshot));
 }
 
-// Reads the same caches the app writes, so the widget works without opening the app.
+export async function loadWidgetSnapshot(): Promise<WidgetSnapshot | null> {
+  const storedSnapshot = await AsyncStorage.getItem(WIDGET_CACHE_KEY);
+  if (!storedSnapshot) return null;
+  let snapshot: WidgetSnapshot;
+  try {
+    snapshot = JSON.parse(storedSnapshot) as WidgetSnapshot;
+  } catch (error) {
+    console.error('Unable to parse prayer widget data:', error);
+    return null;
+  }
+  if (snapshot?.version !== 1 || !(languages as string[]).includes(snapshot.language)
+    || !Number.isInteger(snapshot.year)
+    || (snapshot.city !== null && typeof snapshot.city !== 'string')
+    || (snapshot.months !== null && (typeof snapshot.months !== 'object' || Array.isArray(snapshot.months)))) {
+    console.error('Invalid prayer widget data');
+    return null;
+  }
+  return snapshot;
+}
+
 export async function loadWidgetData(now = new Date()): Promise<WidgetData> {
-  const [storedLanguage, storedLocation, storedDataset] = await Promise.all([
-    AsyncStorage.getItem(LANGUAGE_KEY),
-    AsyncStorage.getItem(LOCATION_CACHE_KEY),
-    AsyncStorage.getItem(PRAYER_CACHE_KEY),
-  ]);
+  const snapshot = await loadWidgetSnapshot();
+  if (snapshot) return buildWidgetData(snapshot, now);
+  const storedLanguage = await AsyncStorage.getItem(LANGUAGE_KEY);
   const language = (languages as string[]).includes(storedLanguage ?? '') ? storedLanguage as Language : 'sv';
-
-  const location = parse(storedLocation) as { city?: unknown; globalPlace?: Partial<GlobalPlace> | null } | null;
-  const city = typeof location?.city === 'string' ? location.city : null;
-  if (!city) return { status: 'empty', language };
-
-  const candidate = location?.globalPlace;
-  const globalPlace = candidate
-    && candidate.name === city
-    && Number.isFinite(candidate.latitude)
-    && Number.isFinite(candidate.longitude)
-    ? candidate as GlobalPlace
-    : null;
-
-  const cached = parse(storedDataset) as { calendarYear?: number; dataset?: PrayerDataset } | null;
-  const dataset = cached?.calendarYear === now.getFullYear() && cached.dataset?.tables ? cached.dataset : null;
-  return buildWidgetData({ city, globalPlace }, dataset, language, now);
+  return { status: 'empty', language };
 }
