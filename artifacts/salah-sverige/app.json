@@ -32,15 +32,20 @@
       [
         "react-native-android-widget",
         {
+          "fonts": [
+            "./node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf",
+            "./node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf",
+            "./node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf"
+          ],
           "widgets": [
             {
               "name": "PrayerTimes",
               "label": "Prayer times",
               "description": "The five daily prayer times, the current and the next prayer.",
               "minWidth": "250dp",
-              "minHeight": "110dp",
+              "minHeight": "65dp",
               "targetCellWidth": 4,
-              "targetCellHeight": 2,
+              "targetCellHeight": 1,
               "resizeMode": "horizontal|vertical",
               "widgetCategory": "home_screen|keyguard",
               "updatePeriodMillis": 1800000

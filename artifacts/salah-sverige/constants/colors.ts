@@ -50,6 +50,6 @@ const colors = {
     compass: '#64C9A9',
   },
   radius: 22,
-};
+} as const;
 
 export default colors;

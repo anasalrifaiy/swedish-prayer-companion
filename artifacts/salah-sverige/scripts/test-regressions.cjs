@@ -36,8 +36,10 @@ function compile(relativePath, replacements = {}) {
 }
 
 const i18n = compile('lib/i18n.ts');
+const colors = compile('constants/colors.ts');
 const { automaticLocationAction } = compile('lib/location-policy.ts');
 const { PrayerWidget } = compile('widgets/PrayerWidget.tsx', {
+  '@/constants/colors': colors,
   '@/lib/i18n': i18n,
   'react-native-android-widget': widgets,
 });
@@ -54,23 +56,34 @@ function allText(tree) {
 }
 
 for (const language of ['sv', 'en', 'ar']) {
-  for (const height of [110, 180]) {
-    const empty = buildWidgetTree(React.createElement(PrayerWidget, { data: { status: 'empty', language }, height }));
+  for (const theme of ['light', 'dark']) {
+    const empty = buildWidgetTree(React.createElement(PrayerWidget, { data: { status: 'empty', language }, theme }));
     assert.ok(allText(empty).includes(i18n.translations[language].widgetOpenApp));
 
     const data = { status: 'ready', language, city: 'Malmö', times, current: 'Dhuhr', next: { name: 'Asr', time: '03:00' } };
-    const ready = buildWidgetTree(React.createElement(PrayerWidget, { data, height }));
+    const ready = buildWidgetTree(React.createElement(PrayerWidget, { data, theme }));
     const text = allText(ready);
-    assert.ok(text.includes(data.city));
+    assert.ok(!text.includes(data.city));
+    assert.equal(text.length, 10);
+    assert.equal(ready.children.length, 1);
+    assert.equal(ready.children[0].children.length, 5);
+    const cells = ready.children[0].children;
+    assert.equal(ready.props.backgroundColor.toLowerCase(), colors.default[theme].card.toLowerCase());
+    assert.equal(cells[1].props.backgroundColor.toLowerCase(), colors.default[theme].primary.toLowerCase());
+    assert.equal(cells[2].props.borderColor.top.toLowerCase(), colors.default[theme].primary.toLowerCase());
+    for (const cell of cells) {
+      assert.equal(cell.children[0].props.fontFamily, 'Inter_600SemiBold');
+      assert.equal(cell.children[1].props.fontFamily, 'Inter_700Bold');
+    }
     for (const { name, time } of times) {
       assert.ok(text.includes(i18n.translations[language].prayerNames[name]));
       assert.ok(text.includes(time));
     }
-    assert.ok(text.includes(i18n.translations[language].widgetNow));
-    assert.ok(text.some((value) => value.includes(i18n.translations[language].widgetNext)));
+    assert.ok(ready.props.accessibilityLabel.includes(i18n.translations[language].widgetNow));
+    assert.ok(ready.props.accessibilityLabel.includes(i18n.translations[language].widgetNext));
   }
 }
-console.log('Widget tree renders for empty and populated data in all languages and sizes.');
+console.log('Widget renders one row with app fonts and colors in all languages and themes.');
 
 const granted = { granted: true, canAskAgain: true };
 const askable = { granted: false, canAskAgain: true };
@@ -119,8 +132,8 @@ async function testWidgetStorage() {
   const savedData = await widgetData.loadWidgetData(now);
   assert.deepEqual(savedData, widgetData.buildWidgetData(snapshot, now));
   assert.equal(savedData.city, 'Stockholm');
-  const savedTree = buildWidgetTree(React.createElement(PrayerWidget, { data: savedData, height: 180 }));
-  assert.ok(allText(savedTree).includes('Stockholm'));
+  const savedTree = buildWidgetTree(React.createElement(PrayerWidget, { data: savedData, theme: 'light' }));
+  assert.ok(!allText(savedTree).includes('Stockholm'));
   assert.ok(allText(savedTree).includes('05:40'));
   assert.equal(widgetData.buildWidgetData(snapshot, now).current, 'Dhuhr');
   assert.equal(widgetData.buildWidgetData(snapshot, now).next.name, 'Asr');

@@ -8,5 +8,8 @@ export const PRAYER_WIDGET_NAME = 'PrayerTimes';
 export async function renderPrayerWidget(info: WidgetInfo, snapshot?: WidgetSnapshot) {
   const now = new Date();
   const data = snapshot ? buildWidgetData(snapshot, now) : await loadWidgetData(now);
-  return <PrayerWidget data={data} height={info.height} />;
+  return {
+    light: <PrayerWidget data={data} theme="light" />,
+    dark: <PrayerWidget data={data} theme="dark" />,
+  };
 }
