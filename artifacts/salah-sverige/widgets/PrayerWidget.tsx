@@ -14,16 +14,22 @@ export function PrayerWidget({ data, theme }: Props) {
   const root = {
     width: 'match_parent',
     height: 'match_parent',
-    padding: 6,
+    justifyContent: 'center',
+  } as const;
+  const card = {
+    width: 'match_parent',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
     borderRadius: colors.radius,
     backgroundColor: palette.card,
-    justifyContent: 'center',
   } as const;
 
   if (data.status === 'empty') {
     return (
       <FlexWidget clickAction="OPEN_APP" style={{ ...root, alignItems: 'center' }}>
-        <TextWidget text={t.widgetOpenApp} style={{ fontFamily: 'Inter_400Regular', fontSize: 14, color: palette.foreground }} />
+        <FlexWidget style={{ ...card, alignItems: 'center' }}>
+          <TextWidget text={t.widgetOpenApp} style={{ fontFamily: 'Inter_400Regular', fontSize: 14, color: palette.foreground }} />
+        </FlexWidget>
       </FlexWidget>
     );
   }
@@ -35,7 +41,7 @@ export function PrayerWidget({ data, theme }: Props) {
 
   return (
     <FlexWidget clickAction="OPEN_APP" accessibilityLabel={accessibilityLabel} style={root}>
-      <FlexWidget style={{ width: 'match_parent', flexDirection: 'row', flexGap: 3 }}>
+      <FlexWidget style={{ ...card, flexDirection: 'row', flexGap: 6 }}>
         {data.times.map(({ name, time }) => {
           const isCurrent = name === data.current;
           const isNext = name === data.next?.name;
@@ -44,9 +50,10 @@ export function PrayerWidget({ data, theme }: Props) {
               key={name}
               style={{
                 flex: 1,
+                width: 0,
                 alignItems: 'center',
-                paddingVertical: 5,
-                borderRadius: 12,
+                paddingVertical: 3,
+                borderRadius: 8,
                 backgroundColor: isCurrent ? palette.primary : palette.card,
                 borderWidth: isNext ? 1 : 0,
                 borderColor: palette.primary,

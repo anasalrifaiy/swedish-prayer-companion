@@ -68,10 +68,19 @@ for (const language of ['sv', 'en', 'ar']) {
     assert.equal(ready.children.length, 1);
     assert.equal(ready.children[0].children.length, 5);
     const cells = ready.children[0].children;
-    assert.equal(ready.props.backgroundColor.toLowerCase(), colors.default[theme].card.toLowerCase());
+    assert.equal(ready.props.backgroundColor, undefined);
+    assert.equal(ready.children[0].props.backgroundColor.toLowerCase(), colors.default[theme].card.toLowerCase());
+    assert.equal(ready.children[0].props.height, undefined);
+    assert.equal(ready.children[0].props.padding.top, 4);
+    assert.equal(ready.children[0].props.padding.bottom, 4);
+    assert.equal(ready.children[0].props.separator.size, 6);
     assert.equal(cells[1].props.backgroundColor.toLowerCase(), colors.default[theme].primary.toLowerCase());
     assert.equal(cells[2].props.borderColor.top.toLowerCase(), colors.default[theme].primary.toLowerCase());
     for (const cell of cells) {
+      assert.equal(cell.props.width, 0);
+      assert.equal(cell.props.weight, 1);
+      assert.equal(cell.props.padding.top, 3);
+      assert.equal(cell.props.padding.bottom, 3);
       assert.equal(cell.children[0].props.fontFamily, 'Inter_600SemiBold');
       assert.equal(cell.children[1].props.fontFamily, 'Inter_700Bold');
     }
@@ -81,6 +90,23 @@ for (const language of ['sv', 'en', 'ar']) {
     }
     assert.ok(ready.props.accessibilityLabel.includes(i18n.translations[language].widgetNow));
     assert.ok(ready.props.accessibilityLabel.includes(i18n.translations[language].widgetNext));
+
+    for (let index = 0; index < times.length; index += 1) {
+      const current = times[index].name;
+      const next = times[(index + 1) % times.length].name;
+      const tree = buildWidgetTree(React.createElement(PrayerWidget, {
+        data: { ...data, current, next: { name: next, time: '03:00' } },
+        theme,
+      }));
+      const row = tree.children[0];
+      assert.equal(row.props.separator.size, 6);
+      assert.equal(row.children[index].props.backgroundColor.toLowerCase(), colors.default[theme].primary.toLowerCase());
+      assert.equal(row.children[(index + 1) % times.length].props.borderWidth.left, 1);
+      for (const cell of row.children) {
+        assert.equal(cell.props.width, 0);
+        assert.equal(cell.props.weight, 1);
+      }
+    }
   }
 }
 console.log('Widget renders one row with app fonts and colors in all languages and themes.');
