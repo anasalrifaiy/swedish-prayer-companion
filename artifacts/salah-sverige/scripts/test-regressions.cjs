@@ -73,16 +73,22 @@ for (const language of ['sv', 'en', 'ar']) {
     assert.equal(ready.children[0].props.height, undefined);
     assert.equal(ready.children[0].props.padding.top, 4);
     assert.equal(ready.children[0].props.padding.bottom, 4);
+    assert.equal(ready.children[0].props.padding.left, 12);
+    assert.equal(ready.children[0].props.padding.right, 12);
     assert.equal(ready.children[0].props.separator.size, 6);
-    assert.equal(cells[1].props.backgroundColor.toLowerCase(), colors.default[theme].primary.toLowerCase());
-    assert.equal(cells[2].props.borderColor.top.toLowerCase(), colors.default[theme].primary.toLowerCase());
+    assert.equal(cells[1].children[0].props.backgroundColor.toLowerCase(), colors.default[theme].primary.toLowerCase());
+    assert.equal(cells[2].children[0].props.borderColor.top.toLowerCase(), colors.default[theme].primary.toLowerCase());
     for (const cell of cells) {
       assert.equal(cell.props.width, 0);
       assert.equal(cell.props.weight, 1);
-      assert.equal(cell.props.padding.top, 3);
-      assert.equal(cell.props.padding.bottom, 3);
-      assert.equal(cell.children[0].props.fontFamily, 'Inter_600SemiBold');
-      assert.equal(cell.children[1].props.fontFamily, 'Inter_700Bold');
+      const highlight = cell.children[0];
+      assert.equal(highlight.props.width, 'wrap_content');
+      assert.equal(highlight.props.padding.left, 4);
+      assert.equal(highlight.props.padding.right, 4);
+      assert.equal(highlight.props.padding.top, 3);
+      assert.equal(highlight.props.padding.bottom, 3);
+      assert.equal(highlight.children[0].props.fontFamily, 'Inter_600SemiBold');
+      assert.equal(highlight.children[1].props.fontFamily, 'Inter_700Bold');
     }
     for (const { name, time } of times) {
       assert.ok(text.includes(i18n.translations[language].prayerNames[name]));
@@ -100,11 +106,12 @@ for (const language of ['sv', 'en', 'ar']) {
       }));
       const row = tree.children[0];
       assert.equal(row.props.separator.size, 6);
-      assert.equal(row.children[index].props.backgroundColor.toLowerCase(), colors.default[theme].primary.toLowerCase());
-      assert.equal(row.children[(index + 1) % times.length].props.borderWidth.left, 1);
+      assert.equal(row.children[index].children[0].props.backgroundColor.toLowerCase(), colors.default[theme].primary.toLowerCase());
+      assert.equal(row.children[(index + 1) % times.length].children[0].props.borderWidth.left, 1);
       for (const cell of row.children) {
         assert.equal(cell.props.width, 0);
         assert.equal(cell.props.weight, 1);
+        assert.equal(cell.children[0].props.width, 'wrap_content');
       }
     }
   }

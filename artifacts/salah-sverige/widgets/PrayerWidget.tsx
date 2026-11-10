@@ -18,7 +18,7 @@ export function PrayerWidget({ data, theme }: Props) {
   } as const;
   const card = {
     width: 'match_parent',
-    paddingHorizontal: 6,
+    paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: colors.radius,
     backgroundColor: palette.card,
@@ -52,23 +52,31 @@ export function PrayerWidget({ data, theme }: Props) {
                 flex: 1,
                 width: 0,
                 alignItems: 'center',
-                paddingVertical: 3,
-                borderRadius: 8,
-                backgroundColor: isCurrent ? palette.primary : palette.card,
-                borderWidth: isNext ? 1 : 0,
-                borderColor: palette.primary,
               }}
             >
-              <TextWidget
-                text={t.prayerNames[name]}
-                maxLines={1}
-                style={{ fontFamily: 'Inter_600SemiBold', fontSize: 11, adjustsFontSizeToFit: true, color: isCurrent ? palette.primaryForeground : isNext ? palette.primary : palette.foreground }}
-              />
-              <TextWidget
-                text={time}
-                maxLines={1}
-                style={{ fontFamily: 'Inter_700Bold', fontSize: 14, adjustsFontSizeToFit: true, color: isCurrent ? palette.primaryForeground : palette.foreground }}
-              />
+              <FlexWidget
+                style={{
+                  width: 'wrap_content',
+                  alignItems: 'center',
+                  paddingHorizontal: 4,
+                  paddingVertical: 3,
+                  borderRadius: 8,
+                  backgroundColor: isCurrent ? palette.primary : palette.card,
+                  borderWidth: isNext ? 1 : 0,
+                  borderColor: palette.primary,
+                }}
+              >
+                <TextWidget
+                  text={t.prayerNames[name]}
+                  maxLines={1}
+                  style={{ fontFamily: 'Inter_600SemiBold', fontSize: 11, adjustsFontSizeToFit: true, color: isCurrent ? palette.primaryForeground : isNext ? palette.primary : palette.foreground }}
+                />
+                <TextWidget
+                  text={time}
+                  maxLines={1}
+                  style={{ fontFamily: 'Inter_700Bold', fontSize: 14, adjustsFontSizeToFit: true, color: isCurrent ? palette.primaryForeground : palette.foreground }}
+                />
+              </FlexWidget>
             </FlexWidget>
           );
         })}
